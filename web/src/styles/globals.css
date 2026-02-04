@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ClawHub-inspired: modern, rustic, network-like */
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-surface text-ink font-sans antialiased;
+    background-image: 
+      linear-gradient(to right, rgba(120, 113, 108, 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(120, 113, 108, 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+}
+
+@layer components {
+  /* Cards — simple elevation, no glass */
+  .card {
+    @apply bg-surface-elevated border border-border rounded-xl p-6 transition-colors;
+  }
+
+  .card-hover {
+    @apply card hover:border-border-light cursor-pointer;
+  }
+
+  /* Buttons — warm accent, compact and refined */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-accent text-white hover:bg-accent-hover transition-colors;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-border text-ink hover:bg-surface-muted transition-colors;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-ink-muted hover:text-ink hover:bg-white/5 transition-colors;
+  }
+
+  /* Inputs */
+  .input-field {
+    @apply w-full px-4 py-3 bg-surface-muted border border-border rounded-lg text-ink placeholder-ink-subtle focus:border-accent focus:ring-1 focus:ring-accent/30 outline-none transition-all;
+  }
+
+  /* Subtle badge / pill */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-accent {
+    @apply badge bg-accent-muted text-accent border border-accent/30;
+  }
+
+  /* Code block */
+  .code-block {
+    @apply bg-surface border border-border rounded-lg p-4 font-mono text-sm overflow-x-auto text-ink-muted;
+  }
+
+  /* Nav / bar — minimal, no glass blur */
+  .nav-bar {
+    @apply bg-surface border-b border-border;
+  }
+
+  /* Legacy fallbacks for docs/submit/agent pages (same look as nav-bar) */
+  .glass {
+    @apply bg-surface border-border;
+  }
+  .gradient-text {
+    @apply text-accent;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+::selection {
+  background-color: rgba(217, 119, 6, 0.25);
+  color: #fafaf9;
+}
+
+/* Scrollbar — warm, minimal */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1c1917;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #57534e;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #78716c;
+}

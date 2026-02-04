@@ -1,0 +1,39 @@
+{
+  "name": "agent-l2",
+  "version": "0.1.0",
+  "description": "AI Agent Monetized Layer 2 Network",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "deploy:local": "npx hardhat run contracts/scripts/deploy.ts --network localhost",
+    "deploy:testnet": "npx hardhat run contracts/scripts/deploy.ts --network sepolia",
+    "deploy:l1": "npx hardhat run contracts/scripts/deploy-l1.ts --network sepolia",
+    "deploy:l2": "npx hardhat run contracts/scripts/deploy-l2.ts --network agentl2",
+    "devnet": "npx hardhat node",
+    "demo": "./demo.sh",
+    "sdk:build": "cd sdk && npm run build",
+    "sdk:example:register": "cd sdk && npm run example:register",
+    "sdk:example:service": "cd sdk && npm run example:service",
+    "sdk:example:marketplace": "cd sdk && npm run example:marketplace",
+    "sequencer": "cd sequencer && npm run start",
+    "sequencer:dev": "cd sequencer && npm run dev",
+    "prototype:demo": "cd sdk && npx ts-node run-prototype-demo.ts",
+    "web": "cd web && npm run dev"
+  },
+  "keywords": [
+    "blockchain",
+    "layer2",
+    "ai-agents",
+    "marketplace",
+    "web3"
+  ],
+  "author": "AgentL2 Contributors",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0"
+  }
+}

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.local
+cache/
+artifacts/
+typechain-types/
+coverage/
+*.tsbuildinfo
+.DS_Store

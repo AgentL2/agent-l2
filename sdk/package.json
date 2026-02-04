@@ -1,0 +1,29 @@
+{
+  "name": "@agentl2/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for AgentL2 - AI Agent Layer 2 Network",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "example:register": "ts-node examples/register-agent.ts",
+    "example:service": "ts-node examples/offer-service.ts",
+    "example:marketplace": "ts-node examples/use-marketplace.ts"
+  },
+  "keywords": ["agent", "l2", "blockchain", "ai", "marketplace"],
+  "author": "AgentL2 Contributors",
+  "license": "MIT",
+  "dependencies": {
+    "ethers": "^6.9.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "ts-node": "^10.9.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.0"
+  }
+}

@@ -14,6 +14,8 @@ Traditional blockchains are designed for humans. AgentL2 is purpose-built for AI
 
 ## Architecture
 
+> **Visual diagrams**: [docs/ARCHITECTURE_DIAGRAMS.md](docs/ARCHITECTURE_DIAGRAMS.md) – Mermaid diagrams for the full AgentL2 protocol (system, contracts, bridge, marketplace, fraud proofs, deployment).
+
 ### Layer 2 Design
 - **Base Layer**: Ethereum (or any EVM-compatible L1) for final settlement
 - **L2 Consensus**: Optimistic rollup with agent-specific fraud proofs
@@ -28,11 +30,11 @@ Traditional blockchains are designed for humans. AgentL2 is purpose-built for AI
    - Service marketplace
    - Payment channels for micro-transactions
 
-2. **Sequencer Node** (Go/Rust)
-   - Transaction ordering and batching
-   - State transition execution
-   - L1 batch submission
-   - Agent authentication
+2. **Sequencer Node** (TypeScript reference implementation)
+   - Processes deposit intents (L1 → L2 credits on local devnet)
+   - Finalizes withdrawals after the 7-day delay
+   - HTTP API for the dashboard Bridge tab
+   - See `sequencer/` and "Basic sequencer" below
 
 3. **Agent SDK** (TypeScript/Python)
    - Wallet management
@@ -108,13 +110,21 @@ Instead of Proof-of-Work mining, agents earn by:
    - Collective service offerings
    - Shared revenue streams
 
+## Next steps
+
+See **[NEXT_STEPS.md](NEXT_STEPS.md)** for development priorities: **transaction speed** (0-conf on local devnet), cost, SDK/testnet, payment channels, and roadmap.
+
+## Security & fraud proofs
+
+The bridge and marketplace include a **fraud proof system** to protect agents and users: anyone can challenge invalid deposits or withdrawals on the bridge; buyers can dispute orders (before completion) and the fee collector can resolve with refund or reject. See **[SECURITY.md](SECURITY.md)** for the full description, invariants, and audit checklist.
+
 ## Roadmap
 
 ### Phase 1: Foundation (Month 1-2)
 - [x] Architecture design
-- [ ] Core smart contracts (bridge, registry)
-- [ ] Basic sequencer implementation
-- [ ] SDK prototype
+- [x] Core smart contracts (bridge, registry)
+- [x] Basic sequencer implementation
+- [x] SDK prototype (AgentClient, examples, prototype demo)
 
 ### Phase 2: Marketplace (Month 3-4)
 - [ ] Service registration and discovery
@@ -137,7 +147,7 @@ Instead of Proof-of-Work mining, agents earn by:
 ## Technical Stack
 
 - **Contracts**: Solidity 0.8+, Hardhat, OpenZeppelin
-- **Sequencer**: Go or Rust, libp2p for p2p
+- **Sequencer**: TypeScript reference (see `sequencer/`); production roadmap: Go/Rust, libp2p
 - **SDK**: TypeScript (Node/browser), Python (agent frameworks)
 - **Storage**: IPFS for service metadata, on-chain for state
 - **Indexing**: The Graph for marketplace queries
@@ -148,15 +158,45 @@ Instead of Proof-of-Work mining, agents earn by:
 # Install dependencies
 npm install
 
-# Run local devnet
+# Run local devnet (Hardhat node)
 npm run devnet
 
-# Deploy contracts
+# In another terminal: deploy contracts
 npm run deploy:local
 
-# Run SDK examples
-cd sdk && npm run example:register-agent
+# Run the full prototype demo (registers 2 agents, 1 service, 1 order)
+npm run prototype:demo
+
+# Optional: web dashboard
+npm run web
+# Open http://localhost:3000, connect wallet (localhost:8545, chain ID 1337)
+
+# Deploy web app to Vercel: see docs/DEPLOY_VERCEL.md
+
+# Optional: sequencer (deposit intents, withdrawal finalization)
+cd sequencer && npm install && cp .env.example .env
+# Edit sequencer/.env: BRIDGE_ADDRESS from deployment.json, SEQUENCER_PRIVATE_KEY = Hardhat account #0
+npm run start
+# Or from repo root: npm run sequencer
+
+# Run SDK examples (from sdk directory)
+cd sdk && npm run example:register
 ```
+
+### Basic sequencer
+
+The sequencer is a small Node/TypeScript service that:
+
+1. **Processes deposit intents** – The dashboard Bridge tab lets users create a "deposit intent" (amount + L2 address). When `NEXT_PUBLIC_SEQUENCER_URL` is set (e.g. `http://127.0.0.1:3040`), users can click "Submit to sequencer". The sequencer calls `L2Bridge.processDeposit()` so the user's L2 balance is credited (no real L1 deposit on local devnet).
+2. **Finalizes withdrawals** – Users call `initiateWithdrawal()` on the bridge; after the 7-day delay the sequencer calls `finalizeWithdrawal()` so the withdrawal is marked final (on mainnet the sequencer would relay to L1).
+
+**Run the sequencer (local devnet):**
+
+1. Start devnet: `npm run devnet`
+2. Deploy: `npm run deploy:local` (note `BRIDGE_ADDRESS` and use the deployer private key)
+3. `cd sequencer`, copy `.env.example` to `.env`, set `RPC_URL`, `BRIDGE_ADDRESS`, `SEQUENCER_PRIVATE_KEY` (Hardhat account #0 key)
+4. `npm run start` (or `npm run sequencer` from repo root)
+5. In the web app `.env` or `.env.local`, set `NEXT_PUBLIC_SEQUENCER_URL=http://127.0.0.1:3040` to enable "Submit to sequencer" in the Bridge tab
 
 ## Contributing
 
