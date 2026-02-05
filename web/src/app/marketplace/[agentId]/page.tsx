@@ -22,6 +22,12 @@ export default function AgentDetailPage() {
   const [data, setData] = useState<AgentDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { address, isConnecting, connect, getSigner } = useWallet();
+  const [purchaseServiceId, setPurchaseServiceId] = useState<string>('');
+  const [purchaseUnits, setPurchaseUnits] = useState<string>('1');
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [purchaseTxHash, setPurchaseTxHash] = useState<string | null>(null);
 
   useEffect(() => {
     if (!agentId || !agentId.startsWith('0x')) {
@@ -31,11 +37,55 @@ export default function AgentDetailPage() {
     }
     let cancelled = false;
     getAgent(agentId)
-      .then(res => { if (!cancelled) setData(res); })
+      .then(res => {
+        if (cancelled) return;
+        if (res?.agent) setData(res);
+        else setError('Invalid response');
+      })
       .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [agentId]);
+
+  const handlePurchase = useCallback(async () => {
+    if (!purchaseServiceId || !data) return;
+    const service = data.services?.find((s: { serviceId?: string }) => s?.serviceId === purchaseServiceId);
+    if (!service) return;
+    const signer = await getSigner();
+    if (!signer) {
+      setPurchaseError('Connect your wallet first.');
+      return;
+    }
+    if (!isWritesConfigured()) {
+      setPurchaseError('Chain not configured.');
+      return;
+    }
+    const units = BigInt(purchaseUnits || '1');
+    if (units < 1n) {
+      setPurchaseError('Units must be at least 1.');
+      return;
+    }
+    const priceWei = BigInt(service?.pricePerUnit ?? 0) * units;
+    setPurchaseLoading(true);
+    setPurchaseError(null);
+    setPurchaseTxHash(null);
+    try {
+      const { orderId, txHash } = await doCreateOrder(
+        signer,
+        purchaseServiceId,
+        units,
+        3600,
+        priceWei
+      );
+      setPurchaseTxHash(txHash);
+      setPurchaseServiceId('');
+      setPurchaseUnits('1');
+    } catch (e) {
+      setPurchaseError(e instanceof Error ? e.message : 'Transaction failed');
+    } finally {
+      setPurchaseLoading(false);
+    }
+  }, [purchaseServiceId, purchaseUnits, data, getSigner]);
 
   if (!agentId || loading) {
     return (
@@ -64,56 +114,21 @@ export default function AgentDetailPage() {
     );
   }
 
-  const { agent, services, orders } = data;
-  const repPct = (agent.reputationScore / 100).toFixed(0);
-  const completedOrders = orders.filter(o => o.status === 1);
+  const agent = data.agent ?? {};
+  const services = Array.isArray(data.services) ? data.services : [];
+  const orders = Array.isArray(data.orders) ? data.orders : [];
+  const repNum = Number(agent.reputationScore ?? 0) / 100;
+  const repPct = Number.isNaN(repNum) ? '0' : String(Math.floor(repNum));
+  const completedOrders = orders.filter((o: { status?: number }) => Number(o?.status) === 1);
 
-  const { address, isConnecting, connect, getSigner } = useWallet();
-  const [purchaseServiceId, setPurchaseServiceId] = useState<string>('');
-  const [purchaseUnits, setPurchaseUnits] = useState<string>('1');
-  const [purchaseLoading, setPurchaseLoading] = useState(false);
-  const [purchaseError, setPurchaseError] = useState<string | null>(null);
-  const [purchaseTxHash, setPurchaseTxHash] = useState<string | null>(null);
-
-  const handlePurchase = useCallback(async () => {
-    if (!purchaseServiceId || !data) return;
-    const service = data.services.find(s => s.serviceId === purchaseServiceId);
-    if (!service) return;
-    const signer = await getSigner();
-    if (!signer) {
-      setPurchaseError('Connect your wallet first.');
-      return;
-    }
-    if (!isWritesConfigured()) {
-      setPurchaseError('Chain not configured.');
-      return;
-    }
-    const units = BigInt(purchaseUnits || '1');
-    if (units < 1n) {
-      setPurchaseError('Units must be at least 1.');
-      return;
-    }
-    const priceWei = BigInt(service.pricePerUnit) * units;
-    setPurchaseLoading(true);
-    setPurchaseError(null);
-    setPurchaseTxHash(null);
+  const safeFormatEth = (val: string | bigint | undefined | null): string => {
+    if (val === undefined || val === null) return '0';
     try {
-      const { orderId, txHash } = await doCreateOrder(
-        signer,
-        purchaseServiceId,
-        units,
-        3600,
-        priceWei
-      );
-      setPurchaseTxHash(txHash);
-      setPurchaseServiceId('');
-      setPurchaseUnits('1');
-    } catch (e) {
-      setPurchaseError(e instanceof Error ? e.message : 'Transaction failed');
-    } finally {
-      setPurchaseLoading(false);
+      return formatEth(val);
+    } catch {
+      return '0';
     }
-  }, [purchaseServiceId, purchaseUnits, data, getSigner]);
+  };
 
   return (
     <div className="min-h-screen bg-surface text-ink">
@@ -137,7 +152,7 @@ export default function AgentDetailPage() {
             </div>
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-bold text-ink font-mono">{truncateAddr(agent.address)}</h1>
+                <h1 className="text-3xl font-bold text-ink font-mono">{truncateAddr(agent.address ?? '')}</h1>
                 {agent.active && (
                   <span className="px-3 py-1 bg-accent-muted text-accent text-sm font-semibold rounded-full flex items-center gap-1">
                     <CheckCircle2 className="w-4 h-4" />
@@ -145,7 +160,7 @@ export default function AgentDetailPage() {
                   </span>
                 )}
               </div>
-              <p className="text-ink-muted font-mono text-sm mb-2">DID: {agent.did}</p>
+              <p className="text-ink-muted font-mono text-sm mb-2">DID: {agent.did ?? '—'}</p>
               <p className="text-ink-subtle text-sm">Metadata: {agent.metadataURI || '—'}</p>
             </div>
           </div>
@@ -153,7 +168,7 @@ export default function AgentDetailPage() {
           <div className="lg:w-80 flex-shrink-0 card">
             <div className="text-center mb-6">
               <div className="text-2xl font-bold text-accent mb-1">Reputation {repPct}%</div>
-              <div className="text-sm text-ink-subtle">Earned {formatEth(agent.totalEarned)} ETH</div>
+              <div className="text-sm text-ink-subtle">Earned {safeFormatEth(agent.totalEarned)} ETH</div>
             </div>
             {!address ? (
               <button
@@ -207,9 +222,9 @@ export default function AgentDetailPage() {
                       className="input-field w-full"
                     >
                       <option value="">Select service</option>
-                      {services.map((s) => (
-                        <option key={s.serviceId} value={s.serviceId}>
-                          {s.serviceType} — {formatEth(s.pricePerUnit)} ETH/unit
+                      {services.map((s, i) => (
+                        <option key={s?.serviceId ?? i} value={s?.serviceId ?? ''}>
+                          {s.serviceType} — {safeFormatEth(s.pricePerUnit)} ETH/unit
                         </option>
                       ))}
                     </select>
@@ -226,11 +241,11 @@ export default function AgentDetailPage() {
                   </div>
                 </div>
                 {purchaseServiceId && (() => {
-                  const s = services.find(x => x.serviceId === purchaseServiceId);
-                  const total = s ? BigInt(s.pricePerUnit) * BigInt(purchaseUnits || '1') : 0n;
+                  const s = services.find(x => x?.serviceId === purchaseServiceId);
+                  const total = s?.pricePerUnit != null ? BigInt(s.pricePerUnit) * BigInt(purchaseUnits || '1') : 0n;
                   return (
                     <p className="text-sm text-ink-muted mb-4">
-                      Total: <span className="font-semibold text-accent">{formatEth(total)} ETH</span>
+                      Total: <span className="font-semibold text-accent">{safeFormatEth(total)} ETH</span>
                     </p>
                   );
                 })()}
@@ -239,7 +254,7 @@ export default function AgentDetailPage() {
                 )}
                 {purchaseTxHash && (
                   <p className="text-green-600 text-sm mb-4">
-                    Order created. Tx: {purchaseTxHash.slice(0, 10)}…{purchaseTxHash.slice(-8)}
+                    Order created. Tx: {String(purchaseTxHash).slice(0, 10)}…{String(purchaseTxHash).slice(-8)}
                   </p>
                 )}
                 <button
@@ -274,13 +289,13 @@ export default function AgentDetailPage() {
               <p className="text-ink-muted text-sm">No services registered yet.</p>
             ) : (
               <ul className="space-y-4">
-                {services.map((s) => (
-                  <li key={s.serviceId} className="border-b border-border pb-4 last:border-0 last:pb-0">
-                    <div className="font-semibold text-ink">{s.serviceType}</div>
+                {services.map((s, i) => (
+                  <li key={s?.serviceId ?? i} className="border-b border-border pb-4 last:border-0 last:pb-0">
+                    <div className="font-semibold text-ink">{s?.serviceType ?? '—'}</div>
                     <div className="text-sm text-ink-subtle font-mono mt-1">
-                      Price: {formatEth(s.pricePerUnit)} ETH/unit
+                      Price: {safeFormatEth(s.pricePerUnit)} ETH/unit
                     </div>
-                    {s.metadataURI && (
+                    {s?.metadataURI && (
                       <div className="text-xs text-ink-muted mt-1 truncate">{s.metadataURI}</div>
                     )}
                   </li>
@@ -295,10 +310,10 @@ export default function AgentDetailPage() {
               <p className="text-ink-muted text-sm">No orders yet.</p>
             ) : (
               <ul className="space-y-3">
-                {orders.slice(0, 10).map((o) => (
-                  <li key={o.orderId} className="flex items-center justify-between text-sm border-b border-border pb-3 last:border-0">
-                    <span className="font-mono text-ink-muted">{o.orderId.slice(0, 10)}…</span>
-                    <span className="text-accent font-semibold">{formatEth(o.totalPrice)} ETH</span>
+                {orders.slice(0, 10).map((o, i) => (
+                  <li key={o?.orderId ?? i} className="flex items-center justify-between text-sm border-b border-border pb-3 last:border-0">
+                    <span className="font-mono text-ink-muted">{String(o?.orderId ?? '').slice(0, 10)}…</span>
+                    <span className="text-accent font-semibold">{safeFormatEth(o.totalPrice)} ETH</span>
                     <span className="text-ink-subtle">{o.status === 1 ? 'Completed' : o.status === 0 ? 'Pending' : 'Other'}</span>
                   </li>
                 ))}
@@ -323,7 +338,7 @@ const client = new AgentClient({
 });
 
 // Get this agent's services
-const services = await client.getServices("${agent.address}");
+const services = await client.getServices("${agent.address ?? ''}");
 // Create order (buyer flow)
 const orderId = await client.purchaseService(serviceId, units, deadline);`}
           </pre>

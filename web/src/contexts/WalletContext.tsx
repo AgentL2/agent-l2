@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { ethers, type Signer } from 'ethers';
 
-interface WalletContextValue {
+export interface WalletContextValue {
   address: string | null;
   isConnecting: boolean;
   error: string | null;
@@ -80,8 +80,16 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+const defaultWalletValue: WalletContextValue = {
+  address: null,
+  isConnecting: false,
+  error: null,
+  connect: async () => {},
+  disconnect: () => {},
+  getSigner: async () => null,
+};
+
 export function useWallet() {
   const ctx = useContext(WalletContext);
-  if (!ctx) throw new Error('useWallet must be used within WalletProvider');
-  return ctx;
+  return ctx ?? defaultWalletValue;
 }
