@@ -2,6 +2,8 @@
 
 This guide walks you through deploying the AgentL2 Next.js web app to [Vercel](https://vercel.com).
 
+> **MVP path:** For a full MVP (contracts on Sepolia + web on Vercel in one flow), use **[MVP_DEPLOY.md](MVP_DEPLOY.md)** instead.
+
 ## Prerequisites
 
 - A [Vercel account](https://vercel.com/signup)

@@ -171,7 +171,8 @@ npm run prototype:demo
 npm run web
 # Open http://localhost:3000, connect wallet (localhost:8545, chain ID 1337)
 
-# Deploy web app to Vercel: see docs/DEPLOY_VERCEL.md
+# **MVP: Deploy app to testnet** – Sepolia or Monad testnet + web on Vercel: see [docs/MVP_DEPLOY.md](docs/MVP_DEPLOY.md) (`npm run deploy:testnet` or `npm run deploy:monad`)
+# Deploy web app to Vercel (env vars): see [docs/DEPLOY_VERCEL.md](docs/DEPLOY_VERCEL.md)
 
 # Optional: sequencer (deposit intents, withdrawal finalization)
 cd sequencer && npm install && cp .env.example .env

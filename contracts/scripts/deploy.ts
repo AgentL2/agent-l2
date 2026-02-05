@@ -5,17 +5,60 @@ import path from "path";
 async function main() {
   console.log("🚀 Deploying AgentL2 Contracts...\n");
 
-  const network = await ethers.provider.getNetwork().catch(() => null);
+  const maxAttempts = 3;
+  const delayMs = 2000;
+  let network: { name: string; chainId: bigint } | null = null;
+  let lastErr: unknown = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      network = await ethers.provider.getNetwork();
+      break;
+    } catch (e) {
+      lastErr = e;
+      if (attempt < maxAttempts) {
+        console.log(`   Attempt ${attempt}/${maxAttempts} failed, retrying in ${delayMs / 1000}s...`);
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    }
+  }
+
   if (!network) {
+    const err = lastErr as { code?: string; message?: string };
+    const code = err?.code ?? "";
+    const message = err?.message ?? String(lastErr);
     console.error("❌ Cannot connect to the network (e.g. localhost:8545).");
-    console.error("   Start the devnet first in another terminal: npm run devnet");
-    console.error("   Then run this again: npm run deploy:local\n");
+    console.error("   Error:", code || message);
+    if (message && message !== code) console.error("   Details:", message);
+    if (code === "ECONNREFUSED") {
+      console.error("\n   Connection refused. In another terminal run: npm run devnet");
+      console.error("   Wait for \"Started HTTP and WebSocket JSON-RPC server\", then run deploy again.");
+    } else {
+      console.error("\n   Ensure devnet is running in another terminal: npm run devnet");
+      console.error("   If using WSL, run both devnet and deploy from the same environment (e.g. both in WSL or both in PowerShell).");
+    }
+    console.error("\n   Then: npm run deploy:local\n");
     process.exit(1);
   }
 
-  const [deployer] = await ethers.getSigners();
+  const signers = await ethers.getSigners();
+  const deployer = signers[0];
+  if (!deployer) {
+    console.error("❌ No deployer account. Set PRIVATE_KEY in .env in the repo root (see .env.example).");
+    process.exit(1);
+  }
+  const balance = await ethers.provider.getBalance(deployer.address);
   console.log("Deploying from account:", deployer.address);
-  console.log("Account balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETH\n");
+  console.log("Account balance:", ethers.formatEther(balance), "ETH\n");
+
+  const networkChainId = Number(network.chainId);
+  if (networkChainId === 1337 && balance === 0n) {
+    console.error("❌ Your deployer account has 0 ETH on the local devnet.");
+    console.error("   The devnet only funds Hardhat's built-in accounts.");
+    console.error("   Fix: comment out or remove PRIVATE_KEY in your .env (repo root).");
+    console.error("   Then deploy again — the script will use the default dev account with 10000 ETH.\n");
+    process.exit(1);
+  }
 
   // 1. Deploy AgentRegistry
   console.log("📝 Deploying AgentRegistry...");
@@ -93,10 +136,13 @@ async function main() {
 
   const chainId = deployment.chainId;
   const isSepolia = chainId === 11155111;
+  const isMonad = chainId === 10143;
   const rpcUrl = isSepolia
     ? (process.env.SEPOLIA_RPC_URL || "https://rpc.sepolia.org")
-    : "http://127.0.0.1:8545";
-  const envLabel = isSepolia ? "Sepolia testnet" : "local";
+    : isMonad
+      ? (process.env.MONAD_RPC_URL || "https://testnet-rpc.monad.xyz")
+      : "http://127.0.0.1:8545";
+  const envLabel = isSepolia ? "Sepolia testnet" : isMonad ? "Monad testnet" : "local";
 
   const rootEnvLocal = [
     `# AgentL2 ${envLabel} deployment (auto-generated)`,
@@ -132,8 +178,8 @@ async function main() {
   console.log(`   REGISTRY_ADDRESS=${registryAddress}`);
   console.log(`   MARKETPLACE_ADDRESS=${marketplaceAddress}`);
   console.log(`   BRIDGE_ADDRESS=${bridgeAddress}`);
-  const networkName = isSepolia ? "sepolia" : "localhost";
-  console.log("\n2. Verify contracts on Etherscan (if on Sepolia, set ETHERSCAN_API_KEY):");
+  const networkName = isSepolia ? "sepolia" : isMonad ? "monadtestnet" : "localhost";
+  console.log("\n2. Verify contracts (if supported for this network, set ETHERSCAN_API_KEY or block explorer API):");
   console.log(`   npx hardhat verify --network ${networkName} ${registryAddress}`);
   console.log(`   npx hardhat verify --network ${networkName} ${marketplaceAddress} ${registryAddress} ${deployer.address}`);
   console.log(`   npx hardhat verify --network ${networkName} ${bridgeAddress} ${deployer.address}`);

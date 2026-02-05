@@ -17,9 +17,10 @@ import RecentActivity from '@/components/dashboard/RecentActivity';
 import ServicesList from '@/components/dashboard/ServicesList';
 import OrdersTable from '@/components/dashboard/OrdersTable';
 import EarningsChart from '@/components/dashboard/EarningsChart';
+import ProofOfWorkPanel from '@/components/dashboard/ProofOfWorkPanel';
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'orders' | 'analytics' | 'settings' | 'bridge'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'orders' | 'analytics' | 'proofofwork' | 'settings' | 'bridge'>('overview');
   const { address, isConnecting, error, connect } = useWallet();
   const [agentData, setAgentData] = useState<AgentDetailResponse | null>(null);
   const [orders, setOrders] = useState<OrderSummary[]>([]);
@@ -231,6 +232,12 @@ export default function Dashboard() {
                   <h3 className="text-2xl font-bold mb-2 text-ink">Analytics</h3>
                   <p className="text-ink-subtle">Aggregate analytics can be built on top of order and earnings data from the API.</p>
                 </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'proofofwork' && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <ProofOfWorkPanel />
               </motion.div>
             )}
 

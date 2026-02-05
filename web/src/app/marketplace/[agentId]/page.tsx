@@ -5,6 +5,7 @@ import {
   ArrowLeft, Star, Zap, CheckCircle2, Copy, Code, Bot, Cpu, Wallet, ShoppingCart, Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { ethers } from 'ethers';
 import { useWallet } from '@/contexts/WalletContext';
 import { getAgent, formatEth, type AgentDetailResponse } from '@/lib/api';
@@ -15,20 +16,17 @@ function truncateAddr(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
-export default function AgentDetailPage({ params }: { params: Promise<{ agentId: string }> }) {
-  const [agentId, setAgentId] = useState<string | null>(null);
+export default function AgentDetailPage() {
+  const params = useParams();
+  const agentId = (params?.agentId as string) ?? null;
   const [data, setData] = useState<AgentDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    params.then(p => setAgentId(p.agentId));
-  }, [params]);
-
-  useEffect(() => {
     if (!agentId || !agentId.startsWith('0x')) {
       setLoading(false);
-      setError('Invalid agent address');
+      setError(agentId ? 'Invalid agent address' : null);
       return;
     }
     let cancelled = false;

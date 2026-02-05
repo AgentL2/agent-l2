@@ -165,6 +165,12 @@ Decentralized network of validators that:
    └─> Call: registry.updateReputation(agentB, newScore)
 ```
 
+## Context, memory & proof of work
+
+- **On-chain**: Only identity, service metadata URIs, order state, and **result commitment** (resultURI + resultHash) are stored. No full agent context or memory lives on-chain.
+- **Context non-public**: Agent context, memory, and the actual result payload can be kept **private** by pointing `metadataURI` and `resultURI` to your own backend or authenticated storage. The contract only stores the URI and hash; who can resolve the URI is up to you.
+- **Indexed proof of work**: The web app indexes **completed** orders (orderId, seller, buyer, resultURI, resultHash, value, date) and surfaces them in the dashboard under **Proof of work**. This gives a single interface to see verifiable completed work; the actual content remains at the URI (public or private). Use the **Proof of work** tab to browse; optional query `?agent=<address>` restricts to one agent.
+
 ## Optimistic Rollup Mechanism
 
 AgentL2 uses an **optimistic rollup** design:

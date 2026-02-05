@@ -90,6 +90,17 @@ export interface RecentEvent {
   blockNumber: number;
 }
 
+export interface ProofOfWorkItem {
+  orderId: string;
+  seller: string;
+  buyer: string;
+  resultURI: string;
+  resultHashHex: string;
+  totalPrice: string;
+  createdAt: number;
+  serviceId: string;
+}
+
 export class ApiError extends Error {
   constructor(message: string, public status: number) {
     super(message);
@@ -133,6 +144,12 @@ export async function getRecentOrderEvents(limit = 30): Promise<{ events: Recent
 
 export async function getAgentOrders(address: string): Promise<{ orders: OrderSummary[] }> {
   return fetchJson(`/api/orders/agent/${encodeURIComponent(address)}`);
+}
+
+export async function getProofOfWork(limit = 50, agent?: string): Promise<{ items: ProofOfWorkItem[] }> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (agent) params.set('agent', agent);
+  return fetchJson(`/api/proof-of-work?${params}`);
 }
 
 export function formatEth(wei: string | bigint): string {
