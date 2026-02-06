@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Wallet, Zap, Plus, ShoppingBag, BarChart3, PieChart, Copy, X, Sparkles,
@@ -22,7 +22,23 @@ import ProofOfWorkPanel from '@/components/dashboard/ProofOfWorkPanel';
 
 const NEW_AGENT_BANNER_KEY = 'agentL2_newAgentBannerDismissed';
 
-export default function Dashboard() {
+function DashboardFallback() {
+  return (
+    <div className="min-h-screen bg-surface text-ink">
+      <DashboardNav
+        activeTab="overview"
+        setActiveTab={() => {}}
+        isConnected={false}
+        address={undefined}
+      />
+      <div className="max-w-[1800px] mx-auto px-6 py-8 flex items-center justify-center min-h-[400px]">
+        <div className="animate-pulse text-ink-muted">Loading…</div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardContent() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'orders' | 'analytics' | 'proofofwork' | 'settings' | 'bridge'>('overview');
   const { address, isConnecting, error, connect } = useWallet();
@@ -373,5 +389,13 @@ export default function Dashboard() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<DashboardFallback />}>
+      <DashboardContent />
+    </Suspense>
   );
 }
