@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Wallet, Zap, Plus, ShoppingBag, BarChart3, PieChart, Copy,
+  Wallet, Zap, Plus, ShoppingBag, BarChart3, PieChart, Copy, X, Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 
 import { useWallet } from '@/contexts/WalletContext';
 import { getAgent, getAgentOrders, ApiError, type AgentDetailResponse, type OrderSummary } from '@/lib/api';
@@ -19,7 +20,10 @@ import OrdersTable from '@/components/dashboard/OrdersTable';
 import EarningsChart from '@/components/dashboard/EarningsChart';
 import ProofOfWorkPanel from '@/components/dashboard/ProofOfWorkPanel';
 
+const NEW_AGENT_BANNER_KEY = 'agentL2_newAgentBannerDismissed';
+
 export default function Dashboard() {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'orders' | 'analytics' | 'proofofwork' | 'settings' | 'bridge'>('overview');
   const { address, isConnecting, error, connect } = useWallet();
   const [agentData, setAgentData] = useState<AgentDetailResponse | null>(null);
@@ -27,6 +31,19 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [agentError, setAgentError] = useState<string | null>(null);
   const [agentErrorStatus, setAgentErrorStatus] = useState<number | null>(null);
+  const [showNewAgentBanner, setShowNewAgentBanner] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isNew = searchParams?.get('new') === '1';
+    const dismissed = sessionStorage.getItem(NEW_AGENT_BANNER_KEY);
+    setShowNewAgentBanner(!!isNew && !dismissed);
+  }, [searchParams]);
+
+  const dismissNewAgentBanner = () => {
+    if (typeof window !== 'undefined') sessionStorage.setItem(NEW_AGENT_BANNER_KEY, '1');
+    setShowNewAgentBanner(false);
+  };
 
   useEffect(() => {
     if (!address) {
@@ -73,6 +90,47 @@ export default function Dashboard() {
       />
 
       <div className="max-w-[1800px] mx-auto px-6 py-8">
+        <AnimatePresence>
+          {showNewAgentBanner && isConnected && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-6 card border-accent/30 bg-accent/5 flex items-center justify-between gap-4 flex-wrap"
+            >
+              <div className="flex items-center gap-3">
+                <Sparkles className="w-6 h-6 text-accent shrink-0" />
+                <div>
+                  <p className="font-semibold text-ink">Your agent is live.</p>
+                  <p className="text-sm text-ink-muted">It can accept orders and run autonomously.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {address && (
+                  <Link
+                    href={`/marketplace/${encodeURIComponent(address)}`}
+                    className="btn-secondary text-sm"
+                  >
+                    View on Marketplace
+                  </Link>
+                )}
+                <Link href="/marketplace/submit" className="btn-primary text-sm inline-flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Add service
+                </Link>
+                <button
+                  type="button"
+                  onClick={dismissNewAgentBanner}
+                  className="p-2 rounded-lg hover:bg-white/10 text-ink-muted hover:text-ink transition-colors"
+                  aria-label="Dismiss"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {!isConnected ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -298,6 +356,15 @@ export default function Dashboard() {
                   <div className="card">
                     <h3 className="text-xl font-semibold mb-4 text-ink">Protocol</h3>
                     <p className="text-ink-muted text-sm">Fee structure and withdrawal are configured in the smart contracts. Use the SDK for transactions.</p>
+                  </div>
+                  <div className="card md:col-span-2">
+                    <h3 className="text-xl font-semibold mb-4 text-ink">Autonomous execution</h3>
+                    <p className="text-ink-muted text-sm mb-3">
+                      Status: <span className="text-ink-subtle font-medium">Not configured</span>. Orders are created on-chain; a worker or webhook can complete them automatically when you configure execution.
+                    </p>
+                    <Link href="/docs/autonomous-agents" className="text-accent hover:underline text-sm font-medium">
+                      Learn how to configure autonomous execution →
+                    </Link>
                   </div>
                 </div>
               </motion.div>

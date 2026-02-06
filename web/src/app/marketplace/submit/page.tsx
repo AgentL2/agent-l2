@@ -117,6 +117,7 @@ export default function SubmitAgentPage() {
       if (!agentRegistered) {
         const did = generateDID(address);
         await doRegisterAgent(signer, address, did, metadataURI || 'ipfs://');
+        setIsFirstTimeAgent(true);
       }
 
       const { serviceId, txHash } = await doRegisterService(
@@ -139,6 +140,7 @@ export default function SubmitAgentPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [newServiceId, setNewServiceId] = useState<string | null>(null);
+  const [isFirstTimeAgent, setIsFirstTimeAgent] = useState(false);
 
   useEffect(() => {
     if (!submitError) return;
@@ -665,16 +667,38 @@ export default function SubmitAgentPage() {
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                transition={{ delay: 0.2, type: 'spring' }}
-                className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-6"
+                transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+                className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${isFirstTimeAgent ? 'bg-green-500/20' : 'bg-green-500/20'}`}
               >
                 <CheckCircle2 className="w-10 h-10 text-green-600" />
               </motion.div>
-              
-              <h2 className="text-2xl font-bold mb-3 text-ink">Agent & Service Registered</h2>
-              <p className="text-ink-muted mb-6">
-                &quot;{formData.name}&quot; is now registered on-chain. Your service is live on the marketplace.
-              </p>
+
+              {isFirstTimeAgent ? (
+                <>
+                  <motion.span
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="inline-block px-3 py-1 bg-green-500/20 text-green-500 text-sm font-semibold rounded-full border border-green-500/30 mb-4"
+                  >
+                    Live on network
+                  </motion.span>
+                  <h2 className="text-2xl font-bold mb-3 text-ink">Your agent is live</h2>
+                  <p className="text-ink-muted mb-4">
+                    Your agent is now on the network. It can receive orders and earn. Add more services anytime from the dashboard.
+                  </p>
+                  <p className="text-ink-subtle text-sm mb-6">
+                    &quot;{formData.name}&quot; and your first service are registered on-chain.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-2xl font-bold mb-3 text-ink">Agent & Service Registered</h2>
+                  <p className="text-ink-muted mb-6">
+                    &quot;{formData.name}&quot; is now registered on-chain. Your service is live on the marketplace.
+                  </p>
+                </>
+              )}
 
               {txHash && (
                 <div className="p-4 bg-surface-muted border border-border rounded-lg mb-4 text-left">
@@ -693,11 +717,17 @@ export default function SubmitAgentPage() {
 
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link href="/marketplace" className="btn-secondary flex-1 flex items-center justify-center gap-2">
-                  <span>Browse Marketplace</span>
+                  <span>View on Marketplace</span>
                 </Link>
-                <Link href="/dashboard" className="btn-primary flex-1 flex items-center justify-center gap-2">
+                <Link href={isFirstTimeAgent ? '/dashboard?new=1' : '/dashboard'} className="btn-primary flex-1 flex items-center justify-center gap-2">
                   <span>Go to Dashboard</span>
                 </Link>
+                {isFirstTimeAgent && (
+                  <Link href="/marketplace/submit" className="btn-ghost flex-1 flex items-center justify-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    <span>Add another service</span>
+                  </Link>
+                )}
               </div>
             </div>
           </motion.div>

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { DM_Sans, JetBrains_Mono } from 'next/font/google'
 import { WalletProvider } from '@/contexts/WalletContext'
+import { ToastProvider } from '@/contexts/ToastContext'
 import '../styles/globals.css'
 
 const dmSans = DM_Sans({
@@ -40,7 +41,9 @@ export default function RootLayout({
     <html lang="en" className={`${dmSans.variable} ${jetbrainsMono.variable}`}>
       <body className="font-sans">
         <WalletProvider>
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </WalletProvider>
       </body>
     </html>

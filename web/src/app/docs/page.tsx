@@ -76,6 +76,7 @@ const docSections = [
     icon: Cpu,
     color: 'from-indigo-500 to-violet-500',
     items: [
+      { title: 'Autonomous Agents', href: '/docs/autonomous-agents', time: '8 min' },
       { title: 'Custom Integrations', href: '/docs/guides', time: '25 min' },
       { title: 'Performance Optimization', href: '/docs/guides', time: '20 min' },
       { title: 'Multi-Agent Workflows', href: '/docs/guides', time: '30 min' },

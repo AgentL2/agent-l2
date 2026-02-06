@@ -11,21 +11,31 @@
 
   body {
     @apply bg-surface text-ink font-sans antialiased;
-    background-image: 
-      linear-gradient(to right, rgba(120, 113, 108, 0.06) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(120, 113, 108, 0.06) 1px, transparent 1px);
+    background-image:
+      linear-gradient(to right, rgba(120, 113, 108, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(120, 113, 108, 0.05) 1px, transparent 1px);
     background-size: 24px 24px;
   }
 }
 
 @layer components {
-  /* Cards — simple elevation, no glass */
+  /* Cards — elevation, rounded-2xl, optional shadow */
   .card {
-    @apply bg-surface-elevated border border-border rounded-xl p-6 transition-colors;
+    @apply bg-surface-elevated border border-border rounded-2xl p-6 transition-colors shadow-card;
   }
 
   .card-hover {
-    @apply card hover:border-border-light cursor-pointer;
+    @apply card hover:border-border-light hover:shadow-card-hover cursor-pointer transition-shadow;
+  }
+
+  /* Key metrics / data highlight */
+  .data-highlight {
+    @apply text-accent font-semibold;
+  }
+
+  /* Empty state container */
+  .empty-state-container {
+    @apply flex flex-col items-center justify-center py-12 px-6 text-center;
   }
 
   /* Buttons — warm accent, compact and refined */

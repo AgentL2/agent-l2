@@ -1,0 +1,23 @@
+{
+  "name": "@agentl2/order-listener",
+  "version": "0.1.0",
+  "description": "Minimal order listener stub for AgentL2 - subscribes to OrderCreated; execution/completeOrder is not implemented",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts"
+  },
+  "keywords": ["agent", "l2", "orders", "listener"],
+  "author": "AgentL2 Contributors",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "ethers": "^6.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  }
+}

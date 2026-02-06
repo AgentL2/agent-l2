@@ -2,15 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Search, Bot, Cpu, Sparkles, Grid, List, Zap, CheckCircle2, Star,
+  Search, Bot, Sparkles, Grid, List, Zap, CheckCircle2, Star,
 } from 'lucide-react';
 import Link from 'next/link';
+import AppNav from '@/components/AppNav';
+import EmptyState from '@/components/EmptyState';
+import MarketplaceAgentCard from '@/components/marketplace/MarketplaceAgentCard';
 import { getAgents, getServices, getStats, formatEth, type AgentSummary, type ServiceSummary } from '@/lib/api';
-
-function truncateAddr(addr: string) {
-  if (!addr || addr.length < 10) return addr;
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
 
 export default function MarketplacePage() {
   const [agents, setAgents] = useState<AgentSummary[]>([]);
@@ -55,27 +53,7 @@ export default function MarketplacePage() {
 
   return (
     <div className="min-h-screen bg-surface text-ink">
-      <nav className="sticky top-0 z-50 nav-bar">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-surface-elevated border border-border flex items-center justify-center">
-                <Cpu className="w-5 h-5 text-accent" />
-              </div>
-              <div>
-                <div className="text-lg font-bold text-ink">AgentL2</div>
-                <div className="text-xs text-ink-subtle">Marketplace</div>
-              </div>
-            </Link>
-            <div className="hidden md:flex items-center gap-6">
-              <Link href="/marketplace" className="text-accent font-semibold">Browse</Link>
-              <Link href="/marketplace/submit" className="text-ink-muted hover:text-ink transition-colors">Submit Agent</Link>
-              <Link href="/docs" className="text-ink-muted hover:text-ink transition-colors">Docs</Link>
-            </div>
-            <Link href="/dashboard" className="btn-primary">Dashboard</Link>
-          </div>
-        </div>
-      </nav>
+      <AppNav variant="app" subtitle="Marketplace" />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="text-center mb-12">
@@ -150,79 +128,40 @@ export default function MarketplacePage() {
             ))}
           </div>
         ) : filteredAgents.length === 0 ? (
-          <div className="card text-center py-20">
-            <Bot className="w-16 h-16 text-ink-subtle mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-ink mb-2">No agents yet</h2>
-            <p className="text-ink-muted mb-4">Register an agent and add services via the SDK. Ensure the chain is running and contracts are deployed.</p>
-            <Link href="/docs/quickstart" className="btn-primary inline-flex items-center gap-2">
-              <span>Quick start</span>
-              <Zap className="w-5 h-5" />
-            </Link>
+          <div className="card">
+            <EmptyState
+              icon={Bot}
+              title="No agents yet"
+              description="Register an agent and add services via the SDK. Ensure the chain is running and contracts are deployed."
+              action={
+                <Link href="/docs/quickstart" className="btn-primary inline-flex items-center gap-2">
+                  <span>Quick start</span>
+                  <Zap className="w-5 h-5" />
+                </Link>
+              }
+            />
           </div>
         ) : viewMode === 'grid' ? (
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredAgents.map((agent) => {
-              const agentServices = servicesByAgent[agent.address.toLowerCase()] ?? [];
-              return (
-                <Link
-                  key={agent.address}
-                  href={`/marketplace/${encodeURIComponent(agent.address)}`}
-                  className="card group cursor-pointer hover:border-border-light block"
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-surface-muted border border-border flex items-center justify-center">
-                      <Bot className="w-5 h-5 text-accent" />
-                    </div>
-                    <span className="text-sm text-ink-subtle font-mono">{truncateAddr(agent.address)}</span>
-                    {agent.active && <CheckCircle2 className="w-4 h-4 text-accent" />}
-                  </div>
-                  <p className="text-ink-muted text-sm mb-3 truncate">DID: {agent.did}</p>
-                  <div className="flex items-center gap-2 text-sm mb-3">
-                    <Star className="w-4 h-4 text-amber-500 fill-current" />
-                    <span className="text-ink">Reputation {(agent.reputationScore / 100).toFixed(0)}%</span>
-                  </div>
-                  <div className="text-sm text-ink-subtle mb-3">
-                    {agentServices.length} service{agentServices.length !== 1 ? 's' : ''} · Earned {formatEth(agent.totalEarned)} ETH
-                  </div>
-                  <div className="pt-4 border-t border-border flex items-center justify-between">
-                    <span className="text-accent font-semibold">View agent</span>
-                    <Zap className="w-4 h-4 text-accent group-hover:translate-x-0.5 transition-transform" />
-                  </div>
-                </Link>
-              );
-            })}
+            {filteredAgents.map((agent) => (
+              <MarketplaceAgentCard
+                key={agent.address}
+                agent={agent}
+                agentServices={servicesByAgent[agent.address.toLowerCase()] ?? []}
+                viewMode="grid"
+              />
+            ))}
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredAgents.map((agent) => {
-              const agentServices = servicesByAgent[agent.address.toLowerCase()] ?? [];
-              return (
-                <Link
-                  key={agent.address}
-                  href={`/marketplace/${encodeURIComponent(agent.address)}`}
-                  className="card group cursor-pointer hover:border-border-light flex items-center gap-6"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-surface-muted border border-border flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-6 h-6 text-accent" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-mono text-ink font-semibold">{truncateAddr(agent.address)}</span>
-                      {agent.active && <CheckCircle2 className="w-4 h-4 text-accent" />}
-                    </div>
-                    <p className="text-sm text-ink-muted truncate">{agent.did}</p>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-ink-subtle">
-                      <span>Reputation {(agent.reputationScore / 100).toFixed(0)}%</span>
-                      <span>{agentServices.length} services</span>
-                      <span>Earned {formatEth(agent.totalEarned)} ETH</span>
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <span className="text-accent font-semibold">View →</span>
-                  </div>
-                </Link>
-              );
-            })}
+            {filteredAgents.map((agent) => (
+              <MarketplaceAgentCard
+                key={agent.address}
+                agent={agent}
+                agentServices={servicesByAgent[agent.address.toLowerCase()] ?? []}
+                viewMode="list"
+              />
+            ))}
           </div>
         )}
       </div>

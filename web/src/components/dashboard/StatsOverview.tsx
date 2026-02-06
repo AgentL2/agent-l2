@@ -22,7 +22,14 @@ export default function StatsOverview({ agent, orders }: StatsOverviewProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="space-y-4">
+      {agent.active && (
+        <p className="text-sm text-ink-muted flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" aria-hidden />
+          Live and accepting orders
+        </p>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
       {stats.map((stat) => (
         <div key={stat.label} className="card group cursor-pointer hover:border-border-light">
           <div className="flex items-center justify-between mb-4">
@@ -40,6 +47,7 @@ export default function StatsOverview({ agent, orders }: StatsOverviewProps) {
           <div className="text-xs text-ink-subtle mt-2">{stat.subtext}</div>
         </div>
       ))}
+      </div>
     </div>
   );
 }

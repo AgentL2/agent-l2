@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { Plus, Eye } from 'lucide-react';
+import { Plus, Eye, Cpu } from 'lucide-react';
 import { formatEth } from '@/lib/api';
+import EmptyState from '@/components/EmptyState';
 
 interface ServiceItem {
   serviceId: string;
@@ -32,9 +33,18 @@ export default function ServicesList({ services }: ServicesListProps) {
 
       <div className="grid gap-6">
         {services.length === 0 ? (
-          <div className="card text-center py-12">
-            <p className="text-ink-muted mb-4">No services registered yet.</p>
-            <p className="text-sm text-ink-subtle">Use the SDK to register a service (registerService).</p>
+          <div className="card">
+            <EmptyState
+              icon={Cpu}
+              title="No services registered yet"
+              description="Use the SDK to register a service (registerService), or add one from the submit flow."
+              action={
+                <Link href="/marketplace/submit" className="btn-primary inline-flex items-center gap-2">
+                  <Plus className="w-5 h-5" />
+                  <span>Add service</span>
+                </Link>
+              }
+            />
           </div>
         ) : (
           services.map((service) => (

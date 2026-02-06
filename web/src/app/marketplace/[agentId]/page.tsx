@@ -10,6 +10,7 @@ import { ethers } from 'ethers';
 import { useWallet } from '@/contexts/WalletContext';
 import { getAgent, formatEth, type AgentDetailResponse } from '@/lib/api';
 import { createOrder as doCreateOrder, isWritesConfigured } from '@/lib/writes';
+import { fetchAgentMetadata, getAgentDisplayName, type AgentMetadata } from '@/lib/agentMetadata';
 
 function truncateAddr(addr: string) {
   if (!addr || addr.length < 10) return addr;
@@ -28,6 +29,7 @@ export default function AgentDetailPage() {
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [purchaseTxHash, setPurchaseTxHash] = useState<string | null>(null);
+  const [metadata, setMetadata] = useState<AgentMetadata | null>(null);
 
   useEffect(() => {
     if (!agentId || !agentId.startsWith('0x')) {
@@ -46,6 +48,15 @@ export default function AgentDetailPage() {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [agentId]);
+
+  useEffect(() => {
+    if (!data?.agent?.metadataURI) return;
+    let cancelled = false;
+    fetchAgentMetadata(data.agent.metadataURI).then((m) => {
+      if (!cancelled) setMetadata(m);
+    });
+    return () => { cancelled = true; };
+  }, [data?.agent?.metadataURI]);
 
   const handlePurchase = useCallback(async () => {
     if (!purchaseServiceId || !data) return;
@@ -120,6 +131,11 @@ export default function AgentDetailPage() {
   const repNum = Number(agent.reputationScore ?? 0) / 100;
   const repPct = Number.isNaN(repNum) ? '0' : String(Math.floor(repNum));
   const completedOrders = orders.filter((o: { status?: number }) => Number(o?.status) === 1);
+  const displayName = metadata ? getAgentDisplayName(metadata, agent.address ?? '') : truncateAddr(agent.address ?? '');
+  const memberSince =
+    agent.registeredAt && Number(agent.registeredAt) > 0
+      ? new Date(Number(agent.registeredAt) * 1000).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+      : null;
 
   const safeFormatEth = (val: string | bigint | undefined | null): string => {
     if (val === undefined || val === null) return '0';
@@ -146,22 +162,48 @@ export default function AgentDetailPage() {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8 mb-8">
-          <div className="flex items-start gap-6">
-            <div className="w-20 h-20 rounded-2xl bg-surface-elevated border border-border flex items-center justify-center">
-              <Bot className="w-10 h-10 text-accent" />
+          <div className="flex items-start gap-6 flex-1 min-w-0">
+            <div className="w-20 h-20 rounded-2xl bg-surface-elevated border border-border flex items-center justify-center overflow-hidden shrink-0">
+              {metadata?.imageUrl ? (
+                <img src={metadata.imageUrl} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <Bot className="w-10 h-10 text-accent" />
+              )}
             </div>
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-bold text-ink font-mono">{truncateAddr(agent.address ?? '')}</h1>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <h1 className="text-3xl font-bold text-ink">{displayName}</h1>
                 {agent.active && (
-                  <span className="px-3 py-1 bg-accent-muted text-accent text-sm font-semibold rounded-full flex items-center gap-1">
+                  <span className="px-3 py-1 bg-green-500/20 text-green-500 text-sm font-semibold rounded-full flex items-center gap-1 border border-green-500/30">
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Active</span>
+                    <span>Agent is live</span>
+                  </span>
+                )}
+                {metadata?.category && (
+                  <span className="px-2 py-1 bg-surface-muted text-ink-muted text-xs font-medium rounded-full border border-border">
+                    {metadata.category}
                   </span>
                 )}
               </div>
-              <p className="text-ink-muted font-mono text-sm mb-2">DID: {agent.did ?? '—'}</p>
-              <p className="text-ink-subtle text-sm">Metadata: {agent.metadataURI || '—'}</p>
+              {metadata?.description && (
+                <p className="text-ink-muted text-sm mb-2 max-w-xl">{metadata.description}</p>
+              )}
+              <div className="flex flex-wrap items-center gap-3 text-sm text-ink-subtle">
+                <span className="font-mono">DID: {agent.did ?? '—'}</span>
+                {memberSince && <span>Member since {memberSince}</span>}
+              </div>
+              {metadata?.tags && metadata.tags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {metadata.tags.slice(0, 5).map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-2 py-0.5 rounded-full bg-surface-muted border border-border text-xs text-ink-muted"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
