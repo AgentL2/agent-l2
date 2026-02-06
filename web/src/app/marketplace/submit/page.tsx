@@ -24,6 +24,7 @@ import {
   registerAgent as doRegisterAgent,
   registerService as doRegisterService,
 } from '@/lib/writes';
+import { LabelWithTooltip, Tooltip } from '@/components/UI/Tooltip';
 
 const categories = [
   { id: 'text', name: 'Text & NLP', icon: '💬' },
@@ -279,7 +280,11 @@ export default function SubmitAgentPage() {
               
               {/* Icon Selection */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-ink-muted mb-3">Agent Icon</label>
+                <LabelWithTooltip
+                  label="Agent Icon"
+                  tooltip="Choose an emoji that represents your agent. Shown on the marketplace and your agent card."
+                />
+                <div className="mb-3" />
                 <div className="flex flex-wrap gap-3">
                   {icons.map((icon) => (
                     <button
@@ -299,7 +304,10 @@ export default function SubmitAgentPage() {
 
               {/* Name */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-ink-muted mb-2">Agent Name *</label>
+                <LabelWithTooltip
+                  label="Agent Name *"
+                  tooltip="Public name for your agent on the marketplace. Keep it clear and recognizable (e.g. SentimentAnalyzer Pro)."
+                />
                 <input
                   type="text"
                   value={formData.name}
@@ -313,7 +321,11 @@ export default function SubmitAgentPage() {
 
               {/* Category */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-ink-muted mb-3">Category *</label>
+                <LabelWithTooltip
+                  label="Category *"
+                  tooltip="Helps buyers find your agent. Choose the best fit (e.g. Text & NLP for language models, Code & Dev for coding assistants)."
+                />
+                <div className="mb-3" />
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {categories.map((cat) => (
                     <button
@@ -334,7 +346,10 @@ export default function SubmitAgentPage() {
 
               {/* Short Description */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-ink-muted mb-2">Short Description *</label>
+                <LabelWithTooltip
+                  label="Short Description *"
+                  tooltip="One or two sentences shown in search and listing cards. Summarize what your agent does and who it's for."
+                />
                 <textarea
                   value={formData.description}
                   onChange={(e) => updateForm('description', e.target.value)}
@@ -348,7 +363,10 @@ export default function SubmitAgentPage() {
 
               {/* Long Description */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-ink-muted mb-2">Full Description</label>
+                <LabelWithTooltip
+                  label="Full Description"
+                  tooltip="Detailed description for your agent's page: features, use cases, inputs/outputs. Markdown is supported. Stored as metadata reference on-chain."
+                />
                 <textarea
                   value={formData.longDescription}
                   onChange={(e) => updateForm('longDescription', e.target.value)}
@@ -360,7 +378,10 @@ export default function SubmitAgentPage() {
 
               {/* Tags */}
               <div>
-                <label className="block text-sm font-medium text-ink-muted mb-2">Tags (up to 5)</label>
+                <LabelWithTooltip
+                  label="Tags (up to 5)"
+                  tooltip="Keywords that help discovery (e.g. nlp, api, real-time). Add a tag and press Enter or click +."
+                />
                 <div className="flex flex-wrap gap-2 mb-3">
                   {formData.tags.map((tag) => (
                     <span
@@ -416,7 +437,11 @@ export default function SubmitAgentPage() {
 
               {/* Pricing Model */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-ink-muted mb-3">Pricing Model *</label>
+                <LabelWithTooltip
+                  label="Pricing Model *"
+                  tooltip="How you charge: per request (each API call), per token (e.g. 1K tokens), per minute, or flat rate per job."
+                />
+                <div className="mb-3" />
                 <div className="grid grid-cols-2 gap-3">
                   {pricingModels.map((model) => (
                     <button
@@ -437,7 +462,10 @@ export default function SubmitAgentPage() {
 
               {/* Price */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-ink-muted mb-2">Price (ETH) *</label>
+                <LabelWithTooltip
+                  label="Price (ETH) *"
+                  tooltip="Price per unit in ETH. A 2.5% platform fee applies; you receive the remainder when orders complete."
+                />
                 <div className="relative">
                   <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-subtle" />
                   <input
@@ -470,7 +498,10 @@ export default function SubmitAgentPage() {
 
               {/* API Endpoint */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-ink-muted mb-2">API Endpoint</label>
+                <LabelWithTooltip
+                  label="API Endpoint"
+                  tooltip="Optional. Your service URL for buyers or autonomous workers that call your API to fulfill orders."
+                />
                 <input
                   type="url"
                   value={formData.apiEndpoint}
@@ -487,10 +518,11 @@ export default function SubmitAgentPage() {
               {/* GitHub */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-ink-muted mb-2">
-                  <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-2">
                     <Github className="w-4 h-4" />
                     <span>GitHub Repository</span>
-                  </div>
+                    <Tooltip content="Link to your agent's source code. Helps builders trust and integrate." iconTrigger side="top" />
+                  </span>
                 </label>
                 <input
                   type="url"
@@ -504,10 +536,11 @@ export default function SubmitAgentPage() {
               {/* Website */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-ink-muted mb-2">
-                  <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-2">
                     <Globe className="w-4 h-4" />
                     <span>Website</span>
-                  </div>
+                    <Tooltip content="Your agent's or project homepage. Optional but builds trust." iconTrigger side="top" />
+                  </span>
                 </label>
                 <input
                   type="url"
@@ -521,10 +554,11 @@ export default function SubmitAgentPage() {
               {/* Documentation */}
               <div>
                 <label className="block text-sm font-medium text-ink-muted mb-2">
-                  <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-2">
                     <FileText className="w-4 h-4" />
                     <span>Documentation URL</span>
-                  </div>
+                    <Tooltip content="Link to API docs or usage guide. Buyers use this to integrate with your service." iconTrigger side="top" />
+                  </span>
                 </label>
                 <input
                   type="url"

@@ -6,6 +6,7 @@
 export interface AgentMetadata {
   name: string;
   description: string;
+  longDescription: string;
   category: string;
   tags: string[];
   imageUrl: string | null;
@@ -14,6 +15,7 @@ export interface AgentMetadata {
 const DEFAULT: AgentMetadata = {
   name: '',
   description: '',
+  longDescription: '',
   category: '',
   tags: [],
   imageUrl: null,
@@ -41,9 +43,12 @@ function toFetchUrl(uri: string): string {
 function parseShape(data: unknown): AgentMetadata {
   if (!data || typeof data !== 'object') return DEFAULT;
   const o = data as Record<string, unknown>;
+  const description = typeof o.description === 'string' ? o.description.slice(0, 2000) : DEFAULT.description;
+  const longDescription = typeof o.longDescription === 'string' ? o.longDescription.slice(0, 10000) : (typeof o.fullDescription === 'string' ? o.fullDescription.slice(0, 10000) : '');
   return {
     name: typeof o.name === 'string' ? o.name.slice(0, 200) : DEFAULT.name,
-    description: typeof o.description === 'string' ? o.description.slice(0, 2000) : DEFAULT.description,
+    description,
+    longDescription: longDescription || description,
     category: typeof o.category === 'string' ? o.category.slice(0, 100) : DEFAULT.category,
     tags: Array.isArray(o.tags)
       ? (o.tags as unknown[]).filter((t): t is string => typeof t === 'string').slice(0, 10)

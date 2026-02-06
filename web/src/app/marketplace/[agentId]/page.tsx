@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  ArrowLeft, Star, Zap, CheckCircle2, Copy, Code, Bot, Cpu, Wallet, ShoppingCart, Loader2,
+  ArrowLeft, Zap, CheckCircle2, Code, Bot, Cpu, Wallet, ShoppingCart, Loader2, FileText, Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -11,6 +11,7 @@ import { useWallet } from '@/contexts/WalletContext';
 import { getAgent, formatEth, type AgentDetailResponse } from '@/lib/api';
 import { createOrder as doCreateOrder, isWritesConfigured } from '@/lib/writes';
 import { fetchAgentMetadata, getAgentDisplayName, type AgentMetadata } from '@/lib/agentMetadata';
+import { Tooltip, LabelWithTooltip } from '@/components/UI/Tooltip';
 
 function truncateAddr(addr: string) {
   if (!addr || addr.length < 10) return addr;
@@ -161,43 +162,44 @@ export default function AgentDetailPage() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8 mb-8">
-          <div className="flex items-start gap-6 flex-1 min-w-0">
-            <div className="w-20 h-20 rounded-2xl bg-surface-elevated border border-border flex items-center justify-center overflow-hidden shrink-0">
+        {/* Hero — ClawHub-style: avatar, name, category, live badge, tagline, meta */}
+        <div className="mb-10">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-6">
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-surface-elevated border-2 border-border flex items-center justify-center overflow-hidden shrink-0 shadow-card">
               {metadata?.imageUrl ? (
                 <img src={metadata.imageUrl} alt="" className="w-full h-full object-cover" />
               ) : (
-                <Bot className="w-10 h-10 text-accent" />
+                <Bot className="w-14 h-14 sm:w-16 sm:h-16 text-accent" />
               )}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <h1 className="text-3xl font-bold text-ink">{displayName}</h1>
+                <h1 className="text-3xl sm:text-4xl font-bold text-ink">{displayName}</h1>
                 {agent.active && (
-                  <span className="px-3 py-1 bg-green-500/20 text-green-500 text-sm font-semibold rounded-full flex items-center gap-1 border border-green-500/30">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Agent is live</span>
+                  <span className="px-3 py-1.5 bg-green-500/20 text-green-600 dark:text-green-400 text-sm font-semibold rounded-full flex items-center gap-1.5 border border-green-500/30">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    <span>Live</span>
                   </span>
                 )}
                 {metadata?.category && (
-                  <span className="px-2 py-1 bg-surface-muted text-ink-muted text-xs font-medium rounded-full border border-border">
+                  <span className="px-3 py-1 bg-surface-muted text-ink-muted text-sm font-medium rounded-full border border-border">
                     {metadata.category}
                   </span>
                 )}
               </div>
               {metadata?.description && (
-                <p className="text-ink-muted text-sm mb-2 max-w-xl">{metadata.description}</p>
+                <p className="text-ink-muted text-base mb-3 max-w-2xl leading-relaxed">{metadata.description}</p>
               )}
-              <div className="flex flex-wrap items-center gap-3 text-sm text-ink-subtle">
-                <span className="font-mono">DID: {agent.did ?? '—'}</span>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-subtle">
                 {memberSince && <span>Member since {memberSince}</span>}
+                <span className="font-mono text-xs">DID: {agent.did ?? '—'}</span>
               </div>
               {metadata?.tags && metadata.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {metadata.tags.slice(0, 5).map((tag) => (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {metadata.tags.slice(0, 8).map((tag) => (
                     <span
                       key={tag}
-                      className="px-2 py-0.5 rounded-full bg-surface-muted border border-border text-xs text-ink-muted"
+                      className="px-2.5 py-1 rounded-full bg-accent/10 text-accent text-xs font-medium border border-accent/20"
                     >
                       {tag}
                     </span>
@@ -206,170 +208,98 @@ export default function AgentDetailPage() {
               )}
             </div>
           </div>
-
-          <div className="lg:w-80 flex-shrink-0 card">
-            <div className="text-center mb-6">
-              <div className="text-2xl font-bold text-accent mb-1">Reputation {repPct}%</div>
-              <div className="text-sm text-ink-subtle">Earned {safeFormatEth(agent.totalEarned)} ETH</div>
-            </div>
-            {!address ? (
-              <button
-                onClick={() => connect()}
-                disabled={isConnecting}
-                className="w-full btn-primary flex items-center justify-center gap-2 mb-4"
-              >
-                <Wallet className="w-5 h-5" />
-                <span>{isConnecting ? 'Connecting…' : 'Connect to Purchase'}</span>
-              </button>
-            ) : (
-              <Link href="/dashboard" className="w-full btn-secondary flex items-center justify-center gap-2 mb-4">
-                <Zap className="w-5 h-5" />
-                <span>Dashboard</span>
-              </Link>
-            )}
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-ink-subtle">Services</span>
-                <span className="font-semibold text-ink">{services.length}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-ink-subtle">Orders</span>
-                <span className="font-semibold text-ink">{orders.length}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-ink-subtle">Completed</span>
-                <span className="font-semibold text-ink">{completedOrders.length}</span>
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* Purchase service */}
-        {services.length > 0 && (
-          <div className="card mb-8 border-accent/30 bg-accent/5">
-            <h2 className="text-xl font-bold text-ink mb-4 flex items-center gap-2">
-              <ShoppingCart className="w-5 h-5 text-accent" />
-              Purchase service
-            </h2>
-            {!address ? (
-              <p className="text-ink-muted text-sm mb-4">Connect your wallet to create an order.</p>
-            ) : (
-              <>
-                <div className="grid sm:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="block text-sm text-ink-muted mb-2">Service</label>
-                    <select
-                      value={purchaseServiceId}
-                      onChange={(e) => setPurchaseServiceId(e.target.value)}
-                      className="input-field w-full"
-                    >
-                      <option value="">Select service</option>
-                      {services.map((s, i) => (
-                        <option key={s?.serviceId ?? i} value={s?.serviceId ?? ''}>
-                          {s.serviceType} — {safeFormatEth(s.pricePerUnit)} ETH/unit
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-ink-muted mb-2">Units</label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={purchaseUnits}
-                      onChange={(e) => setPurchaseUnits(e.target.value)}
-                      className="input-field w-full"
-                    />
-                  </div>
+        <div className="flex flex-col lg:flex-row lg:gap-10 gap-8">
+          {/* Main content */}
+          <div className="flex-1 min-w-0 space-y-8">
+            {/* About */}
+            {(metadata?.longDescription || metadata?.description) && (
+              <section className="card">
+                <h2 className="text-xl font-bold text-ink mb-4 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-accent" />
+                  About this agent
+                </h2>
+                <div className="text-ink-muted leading-relaxed whitespace-pre-wrap max-w-none">
+                  {metadata.longDescription && metadata.longDescription.trim() !== metadata.description?.trim()
+                    ? metadata.longDescription
+                    : metadata.description}
                 </div>
-                {purchaseServiceId && (() => {
-                  const s = services.find(x => x?.serviceId === purchaseServiceId);
-                  const total = s?.pricePerUnit != null ? BigInt(s.pricePerUnit) * BigInt(purchaseUnits || '1') : 0n;
-                  return (
-                    <p className="text-sm text-ink-muted mb-4">
-                      Total: <span className="font-semibold text-accent">{safeFormatEth(total)} ETH</span>
-                    </p>
-                  );
-                })()}
-                {purchaseError && (
-                  <p className="text-red-400 text-sm mb-4">{purchaseError}</p>
-                )}
-                {purchaseTxHash && (
-                  <p className="text-green-600 text-sm mb-4">
-                    Order created. Tx: {String(purchaseTxHash).slice(0, 10)}…{String(purchaseTxHash).slice(-8)}
-                  </p>
-                )}
-                <button
-                  onClick={handlePurchase}
-                  disabled={purchaseLoading || !purchaseServiceId}
-                  className="btn-primary flex items-center gap-2 disabled:opacity-50"
-                >
-                  {purchaseLoading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Creating order…</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="w-5 h-5" />
-                      <span>Create order</span>
-                    </>
-                  )}
-                </button>
-              </>
+              </section>
             )}
-          </div>
-        )}
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          <div className="card">
-            <h2 className="text-xl font-bold text-ink mb-4 flex items-center gap-2">
-              <Cpu className="w-5 h-5 text-accent" />
-              Services
-            </h2>
-            {services.length === 0 ? (
-              <p className="text-ink-muted text-sm">No services registered yet.</p>
-            ) : (
-              <ul className="space-y-4">
-                {services.map((s, i) => (
-                  <li key={s?.serviceId ?? i} className="border-b border-border pb-4 last:border-0 last:pb-0">
-                    <div className="font-semibold text-ink">{s?.serviceType ?? '—'}</div>
-                    <div className="text-sm text-ink-subtle font-mono mt-1">
-                      Price: {safeFormatEth(s.pricePerUnit)} ETH/unit
+            {/* What this agent offers (capabilities from tags) */}
+            {metadata?.tags && metadata.tags.length > 0 && (
+              <section className="card">
+                <h2 className="text-xl font-bold text-ink mb-4 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-accent" />
+                  What this agent offers
+                </h2>
+                <ul className="flex flex-wrap gap-2">
+                  {metadata.tags.map((tag) => (
+                    <li key={tag}>
+                      <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-surface-muted border border-border text-sm text-ink">
+                        {tag}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {/* Services as cards */}
+            <section className="card">
+              <h2 className="text-xl font-bold text-ink mb-4 flex items-center gap-2">
+                <Cpu className="w-5 h-5 text-accent" />
+                Services
+              </h2>
+              {services.length === 0 ? (
+                <p className="text-ink-muted text-sm">No services registered yet.</p>
+              ) : (
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {services.map((s, i) => (
+                    <div
+                      key={s?.serviceId ?? i}
+                      className="p-4 rounded-xl border border-border bg-surface-muted/50 hover:border-border-light transition-colors"
+                    >
+                      <div className="font-semibold text-ink mb-1">{s?.serviceType ?? 'Service'}</div>
+                      <div className="text-sm text-accent font-medium mb-2">
+                        {safeFormatEth(s.pricePerUnit)} ETH per unit
+                      </div>
+                      {s?.metadataURI && (
+                        <p className="text-xs text-ink-subtle line-clamp-2 break-all">{s.metadataURI}</p>
+                      )}
                     </div>
-                    {s?.metadataURI && (
-                      <div className="text-xs text-ink-muted mt-1 truncate">{s.metadataURI}</div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+                  ))}
+                </div>
+              )}
+            </section>
 
-          <div className="card">
-            <h2 className="text-xl font-bold text-ink mb-4">Recent Orders</h2>
-            {orders.length === 0 ? (
-              <p className="text-ink-muted text-sm">No orders yet.</p>
-            ) : (
-              <ul className="space-y-3">
-                {orders.slice(0, 10).map((o, i) => (
-                  <li key={o?.orderId ?? i} className="flex items-center justify-between text-sm border-b border-border pb-3 last:border-0">
-                    <span className="font-mono text-ink-muted">{String(o?.orderId ?? '').slice(0, 10)}…</span>
-                    <span className="text-accent font-semibold">{safeFormatEth(o.totalPrice)} ETH</span>
-                    <span className="text-ink-subtle">{o.status === 1 ? 'Completed' : o.status === 0 ? 'Pending' : 'Other'}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
+            {/* Recent Orders */}
+            <section className="card">
+              <h2 className="text-xl font-bold text-ink mb-4">Recent orders</h2>
+              {orders.length === 0 ? (
+                <p className="text-ink-muted text-sm">No orders yet.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {orders.slice(0, 10).map((o, i) => (
+                    <li key={o?.orderId ?? i} className="flex items-center justify-between text-sm border-b border-border pb-3 last:border-0">
+                      <span className="font-mono text-ink-muted">{String(o?.orderId ?? '').slice(0, 10)}…</span>
+                      <span className="text-accent font-semibold">{safeFormatEth(o.totalPrice)} ETH</span>
+                      <span className="text-ink-subtle">{o.status === 1 ? 'Completed' : o.status === 0 ? 'Pending' : 'Other'}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
 
-        <div className="mt-8 card">
-          <h2 className="text-xl font-bold text-ink mb-4 flex items-center gap-2">
-            <Code className="w-5 h-5 text-accent" />
-            SDK usage
-          </h2>
-          <pre className="bg-surface-muted border border-border rounded-lg p-4 text-sm text-ink-muted font-mono overflow-x-auto">
+            {/* SDK usage */}
+            <section className="card">
+              <h2 className="text-xl font-bold text-ink mb-4 flex items-center gap-2">
+                <Code className="w-5 h-5 text-accent" />
+                SDK usage
+              </h2>
+              <pre className="bg-surface-muted border border-border rounded-lg p-4 text-sm text-ink-muted font-mono overflow-x-auto">
 {`import { AgentClient } from '@agentl2/sdk';
 
 const client = new AgentClient({
@@ -383,7 +313,131 @@ const client = new AgentClient({
 const services = await client.getServices("${agent.address ?? ''}");
 // Create order (buyer flow)
 const orderId = await client.purchaseService(serviceId, units, deadline);`}
-          </pre>
+              </pre>
+            </section>
+          </div>
+
+          {/* Sidebar */}
+          <aside className="lg:w-80 flex-shrink-0 space-y-6">
+            <div className="card sticky top-24">
+              <div className="text-center mb-6">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <span className="text-2xl font-bold text-accent">Reputation {repPct}%</span>
+                  <Tooltip content="On-chain reputation score (0–100%). Builds trust with buyers." iconTrigger side="top" />
+                </div>
+                <div className="text-sm text-ink-subtle">Earned {safeFormatEth(agent.totalEarned)} ETH</div>
+              </div>
+              {!address ? (
+                <button
+                  onClick={() => connect()}
+                  disabled={isConnecting}
+                  className="w-full btn-primary flex items-center justify-center gap-2 mb-4"
+                >
+                  <Wallet className="w-5 h-5" />
+                  <span>{isConnecting ? 'Connecting…' : 'Connect to Purchase'}</span>
+                </button>
+              ) : (
+                <Link href="/dashboard" className="w-full btn-secondary flex items-center justify-center gap-2 mb-4">
+                  <Zap className="w-5 h-5" />
+                  <span>Dashboard</span>
+                </Link>
+              )}
+              <div className="space-y-3 text-sm mb-6">
+                <div className="flex items-center justify-between">
+                  <span className="text-ink-subtle">Services</span>
+                  <span className="font-semibold text-ink">{services.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-ink-subtle">Orders</span>
+                  <span className="font-semibold text-ink">{orders.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-ink-subtle">Completed</span>
+                  <span className="font-semibold text-ink">{completedOrders.length}</span>
+                </div>
+              </div>
+
+              {/* Purchase service — in sidebar */}
+              {services.length > 0 && (
+                <>
+                  <h3 className="text-lg font-bold text-ink mb-3 flex items-center gap-2">
+                    <ShoppingCart className="w-5 h-5 text-accent" />
+                    Purchase
+                  </h3>
+                  {!address ? (
+                    <p className="text-ink-muted text-sm mb-4">Connect your wallet to create an order.</p>
+                  ) : (
+                    <>
+                      <div className="space-y-3 mb-4">
+                        <div>
+                          <label className="block text-sm text-ink-muted mb-1">Service</label>
+                          <select
+                            value={purchaseServiceId}
+                            onChange={(e) => setPurchaseServiceId(e.target.value)}
+                            className="input-field w-full"
+                          >
+                            <option value="">Select service</option>
+                            {services.map((s, i) => (
+                              <option key={s?.serviceId ?? i} value={s?.serviceId ?? ''}>
+                                {s.serviceType} — {safeFormatEth(s.pricePerUnit)} ETH/unit
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <LabelWithTooltip
+                            label="Units"
+                            tooltip="Number of units to purchase. Total cost = price per unit × units."
+                          />
+                          <input
+                            type="number"
+                            min={1}
+                            value={purchaseUnits}
+                            onChange={(e) => setPurchaseUnits(e.target.value)}
+                            className="input-field w-full"
+                          />
+                        </div>
+                      </div>
+                      {purchaseServiceId && (() => {
+                        const s = services.find(x => x?.serviceId === purchaseServiceId);
+                        const total = s?.pricePerUnit != null ? BigInt(s.pricePerUnit) * BigInt(purchaseUnits || '1') : 0n;
+                        return (
+                          <p className="text-sm text-ink-muted mb-3">
+                            Total: <span className="font-semibold text-accent">{safeFormatEth(total)} ETH</span>
+                          </p>
+                        );
+                      })()}
+                      {purchaseError && (
+                        <p className="text-red-400 text-sm mb-3">{purchaseError}</p>
+                      )}
+                      {purchaseTxHash && (
+                        <p className="text-green-600 text-sm mb-3">
+                          Order created. Tx: {String(purchaseTxHash).slice(0, 10)}…{String(purchaseTxHash).slice(-8)}
+                        </p>
+                      )}
+                      <button
+                        onClick={handlePurchase}
+                        disabled={purchaseLoading || !purchaseServiceId}
+                        className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {purchaseLoading ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span>Creating order…</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShoppingCart className="w-5 h-5" />
+                            <span>Create order</span>
+                          </>
+                        )}
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </aside>
         </div>
       </div>
     </div>
