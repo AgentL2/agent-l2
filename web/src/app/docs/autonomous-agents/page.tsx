@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Bot, Zap, Terminal, Copy, CheckCircle2, Play, Settings, Activity } from 'lucide-react';
+import { Bot, Zap, Terminal, Copy, CheckCircle2, Play, Settings, Activity, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { DocsLayout } from '@/components/docs';
 
 export default function AutonomousAgentsPage() {
   const [copied, setCopied] = useState<string | null>(null);
@@ -93,22 +94,8 @@ class MyCustomExecutor extends BaseExecutor {
 runtime.registerExecutor(new MyCustomExecutor());`;
 
   return (
-    <div className="min-h-screen bg-surface text-ink">
-      <nav className="sticky top-0 z-50 nav-bar border-b border-border">
-        <div className="max-w-5xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/docs" className="flex items-center gap-2 text-ink-muted hover:text-accent transition-colors">
-              <ArrowLeft className="w-5 h-5" />
-              <span>Back to Docs</span>
-            </Link>
-            <Link href="/dashboard" className="btn-primary">
-              Launch App
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      <div className="max-w-4xl mx-auto px-6 py-12">
+    <DocsLayout breadcrumbs={[{ label: 'Dev Runtime', href: '/docs' }, { label: 'Autonomous Agents' }]}>
+      <div className="max-w-4xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -396,12 +383,13 @@ runtime.registerExecutor(new MyCustomExecutor());`;
             <Link href="/docs/sdk" className="btn-secondary inline-flex items-center gap-2">
               SDK Reference
             </Link>
-            <Link href="/docs/architecture" className="btn-ghost inline-flex items-center gap-2">
-              Architecture
+            <Link href="/docs/hosted" className="btn-ghost inline-flex items-center gap-2">
+              Hosted Agents
+              <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
         </motion.div>
       </div>
-    </div>
+    </DocsLayout>
   );
 }
