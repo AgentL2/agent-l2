@@ -1,0 +1,378 @@
+// AgentL2 Database Schema
+// PostgreSQL + Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// CORE ENTITIES
+// ============================================
+
+// Agent - The primary identity on the L2
+model Agent {
+  id              String    @id @default(cuid())
+  did             String    @unique // Decentralized Identifier
+  walletAddress   String    @unique
+  name            String
+  description     String?
+  avatar          String?
+  
+  // Verification & Reputation
+  isVerified      Boolean   @default(false)
+  reputation      Float     @default(0)
+  reputationCount Int       @default(0)
+  
+  // Stats (denormalized for performance)
+  totalEarnings   Decimal   @default(0) @db.Decimal(78, 18) // Wei precision
+  totalOrders     Int       @default(0)
+  totalServices   Int       @default(0)
+  
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastActiveAt    DateTime  @default(now())
+  
+  // Relations
+  services        Service[]
+  ordersAsProvider Order[]  @relation("ProviderOrders")
+  ordersAsConsumer Order[]  @relation("ConsumerOrders")
+  transactions    Transaction[]
+  proofs          ProofOfWork[]
+  hostedAgents    HostedAgent[]
+  sessions        Session[]
+  
+  @@index([walletAddress])
+  @@index([reputation])
+  @@index([createdAt])
+}
+
+// Service - AI services offered by agents
+model Service {
+  id              String    @id @default(cuid())
+  agentId         String
+  agent           Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  // Service Details
+  name            String
+  description     String
+  category        ServiceCategory
+  tags            String[]
+  
+  // Pricing
+  pricePerUnit    Decimal   @db.Decimal(78, 18) // Price in Wei
+  priceUnit       String    // "per request", "per 1K tokens", etc.
+  currency        String    @default("ETH")
+  
+  // Configuration
+  endpoint        String?   // API endpoint if hosted
+  schema          Json?     // Input/output schema
+  rateLimit       Int?      // Requests per minute
+  
+  // Stats
+  rating          Float     @default(0)
+  reviewCount     Int       @default(0)
+  totalCalls      Int       @default(0)
+  totalRevenue    Decimal   @default(0) @db.Decimal(78, 18)
+  
+  // Status
+  isActive        Boolean   @default(true)
+  isFeatured      Boolean   @default(false)
+  
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  orders          Order[]
+  proofs          ProofOfWork[]
+  
+  @@index([agentId])
+  @@index([category])
+  @@index([isActive])
+  @@index([rating])
+  @@index([totalCalls])
+}
+
+enum ServiceCategory {
+  TEXT_NLP
+  CODE_DEV
+  VISION_IMAGE
+  DATA_ANALYTICS
+  AUDIO_SPEECH
+  OTHER
+}
+
+// ============================================
+// ORDERS & TRANSACTIONS
+// ============================================
+
+// Order - Service request/fulfillment
+model Order {
+  id              String      @id @default(cuid())
+  
+  // Parties
+  providerId      String
+  provider        Agent       @relation("ProviderOrders", fields: [providerId], references: [id])
+  consumerId      String
+  consumer        Agent       @relation("ConsumerOrders", fields: [consumerId], references: [id])
+  
+  // Service
+  serviceId       String
+  service         Service     @relation(fields: [serviceId], references: [id])
+  
+  // Order Details
+  status          OrderStatus @default(PENDING)
+  input           Json?       // Request payload
+  output          Json?       // Response payload
+  
+  // Pricing
+  amount          Decimal     @db.Decimal(78, 18)
+  currency        String      @default("ETH")
+  fee             Decimal     @default(0) @db.Decimal(78, 18) // Platform fee
+  
+  // Streaming Payments
+  isStreaming     Boolean     @default(false)
+  streamStarted   DateTime?
+  streamEnded     DateTime?
+  streamedAmount  Decimal     @default(0) @db.Decimal(78, 18)
+  
+  // Timestamps
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  completedAt     DateTime?
+  
+  // Relations
+  transactions    Transaction[]
+  proof           ProofOfWork?
+  
+  @@index([providerId])
+  @@index([consumerId])
+  @@index([serviceId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  PROCESSING
+  STREAMING
+  COMPLETED
+  FAILED
+  CANCELLED
+  DISPUTED
+}
+
+// Transaction - Payment ledger
+model Transaction {
+  id              String          @id @default(cuid())
+  
+  // Parties
+  agentId         String
+  agent           Agent           @relation(fields: [agentId], references: [id])
+  orderId         String?
+  order           Order?          @relation(fields: [orderId], references: [id])
+  
+  // Transaction Details
+  type            TransactionType
+  amount          Decimal         @db.Decimal(78, 18)
+  currency        String          @default("ETH")
+  
+  // On-chain reference
+  txHash          String?         @unique
+  blockNumber     Int?
+  
+  // Status
+  status          TxStatus        @default(PENDING)
+  
+  // Timestamps
+  createdAt       DateTime        @default(now())
+  confirmedAt     DateTime?
+  
+  @@index([agentId])
+  @@index([orderId])
+  @@index([txHash])
+  @@index([createdAt])
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  PAYMENT
+  REFUND
+  FEE
+  STREAM_PAYMENT
+}
+
+enum TxStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+}
+
+// ============================================
+// PROOF OF WORK
+// ============================================
+
+// ProofOfWork - Verifiable computation records
+model ProofOfWork {
+  id              String    @id @default(cuid())
+  
+  // Relations
+  agentId         String
+  agent           Agent     @relation(fields: [agentId], references: [id])
+  serviceId       String
+  service         Service   @relation(fields: [serviceId], references: [id])
+  orderId         String    @unique
+  order           Order     @relation(fields: [orderId], references: [id])
+  
+  // Proof Details
+  proofType       ProofType
+  proofHash       String    // Hash of the computation
+  inputHash       String    // Hash of input data
+  outputHash      String    // Hash of output data
+  
+  // Verification
+  isVerified      Boolean   @default(false)
+  verifiedAt      DateTime?
+  verifierSignature String?
+  
+  // Metadata
+  computeTime     Int?      // Milliseconds
+  resourceUsage   Json?     // CPU, memory, etc.
+  
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  
+  @@index([agentId])
+  @@index([serviceId])
+  @@index([proofHash])
+  @@index([isVerified])
+}
+
+enum ProofType {
+  HASH_COMMITMENT
+  ZK_PROOF
+  TEE_ATTESTATION
+  SIGNATURE
+}
+
+// ============================================
+// HOSTED AGENTS
+// ============================================
+
+// HostedAgent - Managed agent instances
+model HostedAgent {
+  id              String          @id @default(cuid())
+  
+  // Owner
+  ownerId         String
+  owner           Agent           @relation(fields: [ownerId], references: [id])
+  
+  // Instance Details
+  name            String
+  description     String?
+  runtime         AgentRuntime
+  
+  // Configuration
+  config          Json?           // Runtime config
+  envVars         Json?           // Environment variables (encrypted)
+  
+  // Resources
+  cpuLimit        Int             @default(100)  // millicores
+  memoryLimit     Int             @default(256)  // MB
+  storageLimit    Int             @default(1024) // MB
+  
+  // Status
+  status          HostedStatus    @default(STOPPED)
+  instanceId      String?         // Container/VM ID
+  endpoint        String?         // Public endpoint
+  
+  // Usage
+  totalUptime     Int             @default(0) // Seconds
+  totalRequests   Int             @default(0)
+  lastHealthCheck DateTime?
+  
+  // Timestamps
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  startedAt       DateTime?
+  
+  @@index([ownerId])
+  @@index([status])
+}
+
+enum AgentRuntime {
+  NODEJS
+  PYTHON
+  DOCKER
+  WASM
+}
+
+enum HostedStatus {
+  STOPPED
+  STARTING
+  RUNNING
+  STOPPING
+  ERROR
+  SUSPENDED
+}
+
+// ============================================
+// AUTH & SESSIONS
+// ============================================
+
+// Session - User sessions
+model Session {
+  id              String    @id @default(cuid())
+  agentId         String
+  agent           Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  // Session Data
+  token           String    @unique
+  walletAddress   String
+  
+  // Metadata
+  userAgent       String?
+  ipAddress       String?
+  
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  expiresAt       DateTime
+  lastUsedAt      DateTime  @default(now())
+  
+  @@index([agentId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+// ============================================
+// ANALYTICS (Optional - for dashboard)
+// ============================================
+
+// DailyStats - Aggregated daily statistics
+model DailyStats {
+  id              String    @id @default(cuid())
+  date            DateTime  @db.Date
+  
+  // Global Stats
+  totalAgents     Int       @default(0)
+  totalServices   Int       @default(0)
+  totalOrders     Int       @default(0)
+  totalVolume     Decimal   @default(0) @db.Decimal(78, 18)
+  
+  // Activity
+  newAgents       Int       @default(0)
+  newServices     Int       @default(0)
+  activeAgents    Int       @default(0)
+  apiCalls        Int       @default(0)
+  
+  @@unique([date])
+  @@index([date])
+}
