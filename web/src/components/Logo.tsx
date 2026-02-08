@@ -5,15 +5,19 @@ interface LogoProps {
   className?: string;
 }
 
-export default function Logo({ size = 40, className = '' }: LogoProps) {
+export default function Logo({ size = 48, className = '' }: LogoProps) {
+  // Logo aspect ratio is 500:333 (3:2)
+  const height = Math.round(size * (333 / 500));
+  
   return (
     <Image
       src="/logo.svg"
       alt="AgentL2 Logo"
       width={size}
-      height={size}
-      className={`rounded-lg ${className}`}
+      height={height}
+      className={`object-contain ${className}`}
       priority
+      unoptimized
     />
   );
 }

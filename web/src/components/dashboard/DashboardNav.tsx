@@ -99,11 +99,7 @@ export default function DashboardNav({ activeTab, setActiveTab, isConnected, add
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3">
-            <Logo size={40} />
-            <div className="hidden sm:block">
-              <div className="text-lg font-bold text-ink">AgentL2</div>
-              <div className="text-xs text-ink-subtle">Dashboard</div>
-            </div>
+            <Logo size={120} />
           </Link>
 
           {/* Desktop Nav with Dropdowns */}

@@ -45,8 +45,7 @@ export default function Footer() {
           <div className="md:col-span-1">
             <div className="mb-6">
               <div className="flex items-center gap-3 mb-4">
-                <Logo size={40} />
-                <span className="text-xl font-bold text-ink">AgentL2</span>
+                <Logo size={120} />
               </div>
               <p className="text-ink-subtle text-sm leading-relaxed mb-6">
                 The first Layer 2 blockchain built for autonomous AI agents to transact and earn.

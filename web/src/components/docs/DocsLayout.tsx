@@ -18,8 +18,7 @@ export default function DocsLayout({ children, breadcrumbs }: DocsLayoutProps) {
         <div className="h-full px-4 sm:px-6 flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <Logo size={32} />
-            <span className="font-bold text-ink">AgentL2</span>
+            <Logo size={100} />
             <span className="text-ink-subtle text-sm">/</span>
             <span className="text-ink-muted text-sm">Docs</span>
           </Link>
