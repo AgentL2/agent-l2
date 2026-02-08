@@ -1,13 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import {
   LayoutDashboard, Bot, ShoppingBag, BarChart3, Settings,
-  Wallet, Cpu, ChevronDown, LogOut, Menu, X, Store, ArrowLeftRight, ShieldCheck, Zap, Cloud
+  Cpu, Menu, X, Store, ArrowLeftRight, ShieldCheck, Zap, Cloud,
+  ChevronDown, Code, BookOpen, Github
 } from 'lucide-react';
 import { useWallet } from '@/contexts/WalletContext';
+import NavDropdown from '@/components/navigation/NavDropdown';
+import WalletDropdown from '@/components/navigation/WalletDropdown';
 
 interface DashboardNavProps {
   activeTab: string;
@@ -16,33 +19,85 @@ interface DashboardNavProps {
   address: string | null;
 }
 
-const navItems = [
-  { id: 'overview' as const, icon: LayoutDashboard, label: 'Overview' },
-  { id: 'services' as const, icon: Bot, label: 'Services' },
-  { id: 'orders' as const, icon: ShoppingBag, label: 'Orders' },
-  { id: 'hosted' as const, icon: Cloud, label: 'Hosted' },
-  { id: 'runtime' as const, icon: Zap, label: 'Dev Runtime' },
-  { id: 'analytics' as const, icon: BarChart3, label: 'Analytics' },
-  { id: 'proofofwork' as const, icon: ShieldCheck, label: 'Proof of work' },
-  { id: 'bridge' as const, icon: ArrowLeftRight, label: 'Bridge' },
-  { id: 'settings' as const, icon: Settings, label: 'Settings' },
+// Dropdown menu items
+const overviewItems = [
+  { 
+    label: 'Dashboard', 
+    href: '/dashboard', 
+    icon: LayoutDashboard,
+    description: 'Your agent overview & stats'
+  },
+  { 
+    label: 'Orders', 
+    href: '/dashboard?tab=orders', 
+    icon: ShoppingBag,
+    description: 'View and manage orders'
+  },
+  { 
+    label: 'Analytics', 
+    href: '/dashboard?tab=analytics', 
+    icon: BarChart3,
+    description: 'Performance insights'
+  },
 ];
 
-function truncateAddress(addr: string) {
-  if (!addr || addr.length < 10) return addr;
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
+const agentsItems = [
+  { 
+    label: 'Services', 
+    href: '/dashboard?tab=services', 
+    icon: Bot,
+    description: 'Manage your AI services'
+  },
+  { 
+    label: 'Hosted Agents', 
+    href: '/dashboard?tab=hosted', 
+    icon: Cloud,
+    description: 'Deploy & manage hosted agents'
+  },
+  { 
+    label: 'Proof of Work', 
+    href: '/dashboard?tab=proofofwork', 
+    icon: ShieldCheck,
+    description: 'View work verification'
+  },
+];
+
+const developersItems = [
+  { 
+    label: 'Dev Runtime', 
+    href: '/dashboard?tab=runtime', 
+    icon: Zap,
+    description: 'Local development environment'
+  },
+  { 
+    label: 'Documentation', 
+    href: '/docs', 
+    icon: BookOpen,
+    description: 'API reference & guides'
+  },
+  { 
+    label: 'GitHub', 
+    href: 'https://github.com/AgentL2/agent-l2', 
+    icon: Github,
+    description: 'Source code & examples',
+    external: true
+  },
+];
 
 export default function DashboardNav({ activeTab, setActiveTab, isConnected, address }: DashboardNavProps) {
-  const { disconnect } = useWallet();
+  const { connect, disconnect } = useWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  const isOverviewActive = ['overview', 'orders', 'analytics'].includes(activeTab);
+  const isAgentsActive = ['services', 'hosted', 'proofofwork'].includes(activeTab);
+  const isDevelopersActive = ['runtime'].includes(activeTab);
 
   return (
     <nav className="sticky top-0 z-50 nav-bar">
       <div className="max-w-[1800px] mx-auto px-6">
         <div className="flex items-center justify-between h-16">
-          <a href="/" className="flex items-center gap-3">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-surface-elevated border border-border flex items-center justify-center">
               <Cpu className="w-5 h-5 text-accent" />
             </div>
@@ -50,25 +105,20 @@ export default function DashboardNav({ activeTab, setActiveTab, isConnected, add
               <div className="text-lg font-bold text-ink">AgentL2</div>
               <div className="text-xs text-ink-subtle">Dashboard</div>
             </div>
-          </a>
+          </Link>
 
-          <div className="hidden lg:flex items-center gap-2">
-            {navItems.map((item) => (
-              <motion.button
-                key={item.id}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-                  activeTab === item.id
-                    ? 'bg-accent text-white'
-                    : 'text-ink-muted hover:text-ink hover:bg-surface-muted'
-                }`}
-              >
-                <item.icon className="w-4 h-4" />
-                <span>{item.label}</span>
-              </motion.button>
-            ))}
+          {/* Desktop Nav with Dropdowns */}
+          <div className="hidden lg:flex items-center gap-1">
+            <NavDropdown 
+              label="Overview" 
+              items={overviewItems} 
+              isActive={isOverviewActive}
+            />
+            <NavDropdown 
+              label="Agents" 
+              items={agentsItems}
+              isActive={isAgentsActive}
+            />
             <Link
               href="/marketplace"
               className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-ink-muted hover:text-ink hover:bg-surface-muted transition-all"
@@ -76,50 +126,36 @@ export default function DashboardNav({ activeTab, setActiveTab, isConnected, add
               <Store className="w-4 h-4" />
               <span>Marketplace</span>
             </Link>
+            <NavDropdown 
+              label="Developers" 
+              items={developersItems}
+              isActive={isDevelopersActive}
+            />
+            <Link
+              href="/dashboard?tab=bridge"
+              onClick={() => setActiveTab('bridge')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                activeTab === 'bridge'
+                  ? 'text-accent bg-accent-muted'
+                  : 'text-ink-muted hover:text-ink hover:bg-surface-muted'
+              }`}
+            >
+              <ArrowLeftRight className="w-4 h-4" />
+              <span>Bridge</span>
+            </Link>
           </div>
 
+          {/* Right Side */}
           <div className="flex items-center gap-4">
-            {isConnected && address && (
-              <div className="relative">
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg bg-surface-muted hover:bg-surface-elevated transition-colors border border-border"
-                >
-                  <div className="w-8 h-8 rounded-full bg-surface-elevated border border-border flex items-center justify-center">
-                    <Bot className="w-4 h-4 text-accent" />
-                  </div>
-                  <div className="hidden md:block text-left">
-                    <div className="text-sm font-semibold text-ink">Agent</div>
-                    <div className="text-xs text-ink-subtle font-mono">{truncateAddress(address)}</div>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 text-ink-muted transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
-                </motion.button>
+            {/* Wallet/Agent Dropdown */}
+            <WalletDropdown 
+              isConnected={isConnected}
+              address={address}
+              onConnect={connect}
+              onDisconnect={disconnect}
+            />
 
-                {userMenuOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="absolute right-0 mt-2 w-64 bg-surface-elevated border border-border rounded-xl overflow-hidden shadow-xl"
-                  >
-                    <div className="p-4 border-b border-border">
-                      <div className="font-mono text-xs text-ink-muted break-all">{address}</div>
-                    </div>
-                    <div className="p-2">
-                      <button
-                        onClick={() => { disconnect(); setUserMenuOpen(false); }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-500/10 text-red-400 transition-colors text-left"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        <span>Disconnect</span>
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </div>
-            )}
-
+            {/* Mobile Menu Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="lg:hidden p-2 rounded-lg hover:bg-surface-muted"
@@ -129,38 +165,114 @@ export default function DashboardNav({ activeTab, setActiveTab, isConnected, add
           </div>
         </div>
 
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            className="lg:hidden border-t border-border py-4"
-          >
-            <div className="space-y-2">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                    activeTab === item.id
-                      ? 'bg-accent text-white'
-                      : 'text-ink-muted hover:text-ink hover:bg-surface-muted'
-                  }`}
-                >
-                  <item.icon className="w-5 h-5" />
-                  <span>{item.label}</span>
-                </button>
-              ))}
-              <Link
-                href="/marketplace"
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-ink-muted hover:text-ink hover:bg-surface-muted transition-all"
-              >
-                <Store className="w-5 h-5" />
-                <span>Marketplace</span>
-              </Link>
-            </div>
-          </motion.div>
-        )}
+        {/* Mobile Menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="lg:hidden border-t border-border py-4 overflow-hidden"
+            >
+              <div className="space-y-6">
+                {/* Overview Section */}
+                <div>
+                  <div className="text-xs font-semibold text-ink-subtle uppercase tracking-wider px-3 mb-2">
+                    Overview
+                  </div>
+                  <div className="space-y-1">
+                    {overviewItems.map((item) => (
+                      <Link
+                        key={item.label}
+                        href={item.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-muted transition-all"
+                      >
+                        <item.icon className="w-5 h-5 text-accent" />
+                        <div>
+                          <div className="font-medium text-ink">{item.label}</div>
+                          <div className="text-xs text-ink-subtle">{item.description}</div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Agents Section */}
+                <div>
+                  <div className="text-xs font-semibold text-ink-subtle uppercase tracking-wider px-3 mb-2">
+                    Agents
+                  </div>
+                  <div className="space-y-1">
+                    {agentsItems.map((item) => (
+                      <Link
+                        key={item.label}
+                        href={item.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-muted transition-all"
+                      >
+                        <item.icon className="w-5 h-5 text-accent" />
+                        <div>
+                          <div className="font-medium text-ink">{item.label}</div>
+                          <div className="text-xs text-ink-subtle">{item.description}</div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Marketplace & Bridge */}
+                <div className="space-y-1">
+                  <Link
+                    href="/marketplace"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-muted transition-all"
+                  >
+                    <Store className="w-5 h-5 text-accent" />
+                    <div>
+                      <div className="font-medium text-ink">Marketplace</div>
+                      <div className="text-xs text-ink-subtle">Browse agents & services</div>
+                    </div>
+                  </Link>
+                  <button
+                    onClick={() => { setActiveTab('bridge'); setMobileMenuOpen(false); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-muted transition-all text-left"
+                  >
+                    <ArrowLeftRight className="w-5 h-5 text-accent" />
+                    <div>
+                      <div className="font-medium text-ink">Bridge</div>
+                      <div className="text-xs text-ink-subtle">Cross-chain transfers</div>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Developers Section */}
+                <div>
+                  <div className="text-xs font-semibold text-ink-subtle uppercase tracking-wider px-3 mb-2">
+                    Developers
+                  </div>
+                  <div className="space-y-1">
+                    {developersItems.map((item) => (
+                      <Link
+                        key={item.label}
+                        href={item.href}
+                        target={item.external ? '_blank' : undefined}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-muted transition-all"
+                      >
+                        <item.icon className="w-5 h-5 text-accent" />
+                        <div>
+                          <div className="font-medium text-ink">{item.label}</div>
+                          <div className="text-xs text-ink-subtle">{item.description}</div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </nav>
   );
