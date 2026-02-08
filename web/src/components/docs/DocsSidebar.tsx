@@ -3,12 +3,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight, ChevronDown, Rocket, Layers, Code, Book,
   Cpu, Zap, Cloud, ShoppingBag, LayoutDashboard, Shield,
-  Terminal, Github, ArrowLeftRight, Users, Settings, FileCode,
-  Search, X, Menu
+  Terminal, Github, FileCode, Search, X, Menu
 } from 'lucide-react';
 
 interface DocSection {
@@ -129,7 +127,7 @@ export default function DocsSidebar({ className = '' }: DocsSidebarProps) {
 
   const isActive = (href: string) => {
     if (href === '/docs') return pathname === '/docs';
-    return pathname.startsWith(href);
+    return pathname === href || pathname.startsWith(href + '/');
   };
 
   const filteredSections = searchQuery
@@ -184,39 +182,29 @@ export default function DocsSidebar({ className = '' }: DocsSidebarProps) {
               )}
             </button>
 
-            <AnimatePresence>
-              {expandedSections.includes(section.title) && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden"
-                >
-                  <div className="ml-4 pl-4 border-l border-border space-y-1 py-2">
-                    {section.items.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setMobileOpen(false)}
-                        className={`flex items-center justify-between px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                          isActive(item.href)
-                            ? 'bg-accent/10 text-accent font-medium'
-                            : 'text-ink-muted hover:text-ink hover:bg-surface-muted'
-                        }`}
-                      >
-                        <span>{item.title}</span>
-                        {item.badge && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-accent/20 text-accent rounded">
-                            {item.badge}
-                          </span>
-                        )}
-                      </Link>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {expandedSections.includes(section.title) && (
+              <div className="ml-4 pl-4 border-l border-border space-y-1 py-2">
+                {section.items.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    className={`flex items-center justify-between px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                      isActive(item.href)
+                        ? 'bg-accent/10 text-accent font-medium'
+                        : 'text-ink-muted hover:text-ink hover:bg-surface-muted'
+                    }`}
+                  >
+                    <span>{item.title}</span>
+                    {item.badge && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-accent/20 text-accent rounded">
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </nav>
@@ -254,33 +242,25 @@ export default function DocsSidebar({ className = '' }: DocsSidebarProps) {
       </button>
 
       {/* Mobile Sidebar */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="lg:hidden fixed inset-0 bg-black/50 z-40"
-              onClick={() => setMobileOpen(false)}
-            />
-            <motion.aside
-              initial={{ x: -300 }}
-              animate={{ x: 0 }}
-              exit={{ x: -300 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="lg:hidden fixed left-0 top-0 bottom-0 w-72 bg-surface border-r border-border z-50 flex flex-col"
-            >
-              <SidebarContent />
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+      {mobileOpen && (
+        <>
+          <div
+            className="lg:hidden fixed inset-0 bg-black/50 z-40"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside className="lg:hidden fixed left-0 top-0 bottom-0 w-72 bg-surface border-r border-border z-50 flex flex-col">
+            <SidebarContent />
+          </aside>
+        </>
+      )}
 
-      {/* Desktop Sidebar */}
-      <aside className={`hidden lg:flex flex-col w-72 bg-surface border-r border-border sticky top-0 h-screen ${className}`}>
+      {/* Desktop Sidebar - Fixed position, no animation */}
+      <aside className={`hidden lg:flex flex-col w-72 bg-surface border-r border-border fixed top-14 left-0 bottom-0 overflow-hidden ${className}`}>
         <SidebarContent />
       </aside>
+
+      {/* Spacer for fixed sidebar */}
+      <div className="hidden lg:block w-72 flex-shrink-0" />
     </>
   );
 }
