@@ -1,25 +1,21 @@
 /**
- * OpenAI Executor
- * Supports GPT-4, GPT-4o, o1, o3 models
+ * DeepSeek Executor
+ * Supports DeepSeek V3, R1 (reasoning) models
  */
 
 import { BaseExecutor, ExecutorInput, ExecutorResult } from './base';
 
-export class OpenAIExecutor extends BaseExecutor {
-  id = 'openai';
-  name = 'OpenAI';
-  provider = 'openai';
-  models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1', 'o1-mini', 'o3-mini'];
-  defaultModel = 'gpt-4o';
+export class DeepSeekExecutor extends BaseExecutor {
+  id = 'deepseek';
+  name = 'DeepSeek';
+  provider = 'deepseek';
+  models = ['deepseek-chat', 'deepseek-reasoner'];
+  defaultModel = 'deepseek-chat';
 
-  // Pricing per 1M tokens (USD)
+  // Pricing per 1M tokens (USD) - Very competitive!
   pricing = {
-    'gpt-4o': { input: 2.50, output: 10.00 },
-    'gpt-4o-mini': { input: 0.15, output: 0.60 },
-    'gpt-4-turbo': { input: 10.00, output: 30.00 },
-    'o1': { input: 15.00, output: 60.00 },
-    'o1-mini': { input: 3.00, output: 12.00 },
-    'o3-mini': { input: 1.10, output: 4.40 },
+    'deepseek-chat': { input: 0.14, output: 0.28 },      // DeepSeek V3
+    'deepseek-reasoner': { input: 0.55, output: 2.19 },  // DeepSeek R1
   };
 
   private apiKey: string;
@@ -27,8 +23,8 @@ export class OpenAIExecutor extends BaseExecutor {
 
   constructor(apiKey?: string) {
     super();
-    this.apiKey = apiKey || process.env.OPENAI_API_KEY || '';
-    this.baseUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
+    this.apiKey = apiKey || process.env.DEEPSEEK_API_KEY || '';
+    this.baseUrl = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
   }
 
   async execute(input: ExecutorInput): Promise<ExecutorResult> {
@@ -38,31 +34,14 @@ export class OpenAIExecutor extends BaseExecutor {
     if (input.systemPrompt) {
       messages.push({ role: 'system', content: input.systemPrompt });
     }
-    
-    // Handle multimodal input
-    if (input.images && input.images.length > 0) {
-      const content: any[] = [{ type: 'text', text: input.prompt }];
-      for (const image of input.images) {
-        content.push({
-          type: 'image_url',
-          image_url: { url: image.startsWith('http') ? image : `data:image/jpeg;base64,${image}` }
-        });
-      }
-      messages.push({ role: 'user', content });
-    } else {
-      messages.push({ role: 'user', content: input.prompt });
-    }
+    messages.push({ role: 'user', content: input.prompt });
 
     const body: any = {
       model,
       messages,
       max_tokens: input.maxTokens || 4096,
+      temperature: input.temperature ?? 0.7,
     };
-
-    // o1/o3 models don't support temperature
-    if (!model.startsWith('o1') && !model.startsWith('o3')) {
-      body.temperature = input.temperature ?? 0.7;
-    }
 
     if (input.tools && input.tools.length > 0) {
       body.tools = input.tools.map(t => ({
@@ -86,11 +65,14 @@ export class OpenAIExecutor extends BaseExecutor {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`OpenAI API error: ${response.status} ${error}`);
+      throw new Error(`DeepSeek API error: ${response.status} ${error}`);
     }
 
     const data = await response.json();
     const usage = data.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+    
+    // DeepSeek R1 includes reasoning tokens
+    const reasoningTokens = usage.reasoning_tokens || 0;
     
     return {
       success: true,
@@ -105,6 +87,8 @@ export class OpenAIExecutor extends BaseExecutor {
       metadata: {
         finishReason: data.choices[0]?.finish_reason,
         toolCalls: data.choices[0]?.message?.tool_calls,
+        reasoningTokens,
+        reasoningContent: data.choices[0]?.message?.reasoning_content,
       },
     };
   }
@@ -122,12 +106,9 @@ export class OpenAIExecutor extends BaseExecutor {
       model,
       messages,
       max_tokens: input.maxTokens || 4096,
+      temperature: input.temperature ?? 0.7,
       stream: true,
     };
-
-    if (!model.startsWith('o1') && !model.startsWith('o3')) {
-      body.temperature = input.temperature ?? 0.7;
-    }
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -139,7 +120,7 @@ export class OpenAIExecutor extends BaseExecutor {
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      throw new Error(`DeepSeek API error: ${response.status}`);
     }
 
     const reader = response.body?.getReader();

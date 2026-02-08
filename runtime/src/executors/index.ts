@@ -1,98 +1,76 @@
 /**
- * Executor Registry
- * Manages available executors and routes tasks to appropriate handlers
+ * AI Model Executors
+ * Export all executors and registry
  */
 
-export { BaseExecutor } from './base.js';
-export { OpenAIExecutor, type OpenAIExecutorConfig } from './openai.js';
-export { WebhookExecutor, type WebhookExecutorConfig, type WebhookResponse } from './webhook.js';
+export * from './base';
+export * from './openai';
+export * from './anthropic';
+export * from './google';
+export * from './deepseek';
+export * from './grok';
+export * from './kimi';
 
-import type { Executor, TaskInput } from '../types.js';
+import { executorRegistry } from './base';
+import { OpenAIExecutor } from './openai';
+import { AnthropicExecutor } from './anthropic';
+import { GoogleExecutor } from './google';
+import { DeepSeekExecutor } from './deepseek';
+import { GrokExecutor } from './grok';
+import { KimiExecutor } from './kimi';
 
-export class ExecutorRegistry {
-  private executors: Map<string, Executor> = new Map();
+/**
+ * Initialize all executors with optional API keys
+ */
+export function initializeExecutors(config?: {
+  openai?: string;
+  anthropic?: string;
+  google?: string;
+  deepseek?: string;
+  xai?: string;
+  moonshot?: string;
+}) {
+  // Register all executors
+  executorRegistry.register(new OpenAIExecutor(config?.openai));
+  executorRegistry.register(new AnthropicExecutor(config?.anthropic));
+  executorRegistry.register(new GoogleExecutor(config?.google));
+  executorRegistry.register(new DeepSeekExecutor(config?.deepseek));
+  executorRegistry.register(new GrokExecutor(config?.xai));
+  executorRegistry.register(new KimiExecutor(config?.moonshot));
 
-  /**
-   * Register an executor
-   */
-  register(executor: Executor): void {
-    this.executors.set(executor.id, executor);
-    console.log(`[Registry] Registered executor: ${executor.name} (${executor.id})`);
-    console.log(`  Service types: ${executor.serviceTypes.join(', ')}`);
-  }
+  console.log(`Initialized ${executorRegistry.list().length} AI executors`);
+  
+  return executorRegistry;
+}
 
-  /**
-   * Unregister an executor
-   */
-  unregister(executorId: string): void {
-    this.executors.delete(executorId);
-  }
+/**
+ * Get executor by ID or find best match for service type
+ */
+export function getExecutor(idOrServiceType: string) {
+  // Try exact match first
+  let executor = executorRegistry.get(idOrServiceType);
+  if (executor) return executor;
 
-  /**
-   * Find an executor that can handle a service type
-   */
-  findExecutor(serviceType: string): Executor | null {
-    for (const executor of this.executors.values()) {
-      if (this.executorHandles(executor, serviceType)) {
-        return executor;
-      }
+  // Try to find by service type
+  executor = executorRegistry.getForServiceType(idOrServiceType);
+  return executor;
+}
+
+/**
+ * List all available models across all executors
+ */
+export function listAllModels() {
+  const models: { provider: string; model: string; pricing: { input: number; output: number } }[] = [];
+  
+  for (const executor of executorRegistry.list()) {
+    for (const model of executor.models) {
+      models.push({
+        provider: executor.provider,
+        model,
+        pricing: executor.pricing[model] || executor.pricing[executor.defaultModel],
+      });
     }
-    return null;
   }
-
-  /**
-   * Get all executors that can handle a service type
-   */
-  findAllExecutors(serviceType: string): Executor[] {
-    const result: Executor[] = [];
-    for (const executor of this.executors.values()) {
-      if (this.executorHandles(executor, serviceType)) {
-        result.push(executor);
-      }
-    }
-    return result;
-  }
-
-  /**
-   * Get executor by ID
-   */
-  get(executorId: string): Executor | null {
-    return this.executors.get(executorId) ?? null;
-  }
-
-  /**
-   * List all registered executors
-   */
-  list(): Executor[] {
-    return Array.from(this.executors.values());
-  }
-
-  /**
-   * Check health of all executors
-   */
-  async healthCheck(): Promise<Map<string, boolean>> {
-    const results = new Map<string, boolean>();
-    for (const [id, executor] of this.executors) {
-      try {
-        results.set(id, await executor.healthCheck());
-      } catch {
-        results.set(id, false);
-      }
-    }
-    return results;
-  }
-
-  /**
-   * Check if an executor handles a service type
-   */
-  private executorHandles(executor: Executor, serviceType: string): boolean {
-    return executor.serviceTypes.some((t) => {
-      if (t === '*') return true;
-      if (t.endsWith('*')) {
-        const prefix = t.slice(0, -1);
-        return serviceType.toLowerCase().startsWith(prefix.toLowerCase());
-      }
-      return t.toLowerCase() === serviceType.toLowerCase();
-    });
-  }
+  
+  return models;
 }

@@ -1,89 +1,136 @@
 /**
- * Base Executor
- * Abstract base class for task executors
+ * Base Executor Interface
+ * All AI model executors implement this interface
  */
 
-import type { Executor, TaskInput, TaskResult, ExecutionEstimate, ExecutionMetadata } from '../types.js';
-import { ProofGenerator } from '../proof.js';
+export interface ExecutorInput {
+  prompt: string;
+  systemPrompt?: string;
+  model?: string;
+  maxTokens?: number;
+  temperature?: number;
+  stream?: boolean;
+  tools?: ToolDefinition[];
+  images?: string[]; // Base64 or URLs
+}
 
-export abstract class BaseExecutor implements Executor {
+export interface ExecutorResult {
+  success: boolean;
+  content: string;
+  model: string;
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  cost: {
+    input: number;
+    output: number;
+    total: number;
+  };
+  metadata?: Record<string, any>;
+}
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  parameters: Record<string, any>;
+}
+
+export interface CostEstimate {
+  estimatedTokens: number;
+  estimatedCost: number;
+  currency: string;
+}
+
+export abstract class BaseExecutor {
   abstract id: string;
   abstract name: string;
-  abstract version: string;
-  abstract serviceTypes: string[];
+  abstract provider: string;
+  abstract models: string[];
+  abstract defaultModel: string;
 
-  protected proofGenerator: ProofGenerator;
+  // Pricing per 1M tokens
+  abstract pricing: {
+    [model: string]: {
+      input: number;
+      output: number;
+    };
+  };
 
-  constructor(privateKey: string) {
-    this.proofGenerator = new ProofGenerator(privateKey);
-  }
+  abstract execute(input: ExecutorInput): Promise<ExecutorResult>;
+  
+  abstract stream(input: ExecutorInput): AsyncGenerator<string, void, unknown>;
 
-  /**
-   * Execute the task - must be implemented by subclasses
-   */
-  abstract execute(task: TaskInput): Promise<TaskResult>;
-
-  /**
-   * Estimate execution cost/time (optional override)
-   */
-  async estimate(task: TaskInput): Promise<ExecutionEstimate> {
+  estimateCost(input: ExecutorInput): CostEstimate {
+    const model = input.model || this.defaultModel;
+    const pricing = this.pricing[model] || this.pricing[this.defaultModel];
+    
+    // Rough estimate: 4 chars per token
+    const estimatedTokens = Math.ceil((input.prompt.length + (input.systemPrompt?.length || 0)) / 4);
+    const estimatedOutputTokens = input.maxTokens || 1000;
+    
+    const inputCost = (estimatedTokens / 1_000_000) * pricing.input;
+    const outputCost = (estimatedOutputTokens / 1_000_000) * pricing.output;
+    
     return {
-      estimatedDurationMs: 5000,
-      estimatedCost: task.totalPrice,
-      confidence: 0.5,
+      estimatedTokens: estimatedTokens + estimatedOutputTokens,
+      estimatedCost: inputCost + outputCost,
+      currency: 'USD',
     };
   }
 
-  /**
-   * Health check - override for custom health logic
-   */
-  async healthCheck(): Promise<boolean> {
-    return true;
-  }
-
-  /**
-   * Helper: Check if this executor handles a service type
-   */
-  handles(serviceType: string): boolean {
-    return this.serviceTypes.some(
-      (t) => t === '*' || t.toLowerCase() === serviceType.toLowerCase()
-    );
-  }
-
-  /**
-   * Helper: Create execution metadata
-   */
-  protected createMetadata(startTime: number, extras?: Partial<ExecutionMetadata>): ExecutionMetadata {
-    const endTime = Date.now();
+  protected calculateCost(model: string, promptTokens: number, completionTokens: number) {
+    const pricing = this.pricing[model] || this.pricing[this.defaultModel];
     return {
-      startTime,
-      endTime,
-      durationMs: endTime - startTime,
-      executorId: this.id,
-      executorVersion: this.version,
-      ...extras,
-    };
-  }
-
-  /**
-   * Helper: Create a failed result
-   */
-  protected createFailedResult(task: TaskInput, error: string, startTime: number): TaskResult {
-    const metadata = this.createMetadata(startTime);
-    return {
-      success: false,
-      resultURI: '',
-      resultHash: new Uint8Array(32),
-      proof: {
-        type: 'llm-completion',
-        timestamp: Date.now(),
-        inputHash: '',
-        outputHash: '',
-        evidence: {},
-        signature: '',
-      },
-      error,
-      metadata,
+      input: (promptTokens / 1_000_000) * pricing.input,
+      output: (completionTokens / 1_000_000) * pricing.output,
+      total: ((promptTokens / 1_000_000) * pricing.input) + ((completionTokens / 1_000_000) * pricing.output),
     };
   }
 }
+
+export class ExecutorRegistry {
+  private executors: Map<string, BaseExecutor> = new Map();
+
+  register(executor: BaseExecutor): void {
+    this.executors.set(executor.id, executor);
+    console.log(`Registered executor: ${executor.name} (${executor.provider})`);
+  }
+
+  get(id: string): BaseExecutor | undefined {
+    return this.executors.get(id);
+  }
+
+  getByProvider(provider: string): BaseExecutor[] {
+    return Array.from(this.executors.values()).filter(e => e.provider === provider);
+  }
+
+  list(): BaseExecutor[] {
+    return Array.from(this.executors.values());
+  }
+
+  getForServiceType(serviceType: string): BaseExecutor | undefined {
+    // Map service types to appropriate executors
+    const mapping: Record<string, string[]> = {
+      'text-generation': ['openai', 'anthropic', 'google', 'deepseek'],
+      'code-review': ['anthropic', 'openai', 'deepseek'],
+      'sentiment-analysis': ['openai', 'google', 'anthropic'],
+      'translation': ['google', 'openai', 'deepseek'],
+      'image-analysis': ['openai', 'google', 'anthropic'],
+      'reasoning': ['openai', 'anthropic', 'deepseek'],
+    };
+
+    const preferredProviders = mapping[serviceType] || ['openai'];
+    
+    for (const provider of preferredProviders) {
+      const executors = this.getByProvider(provider);
+      if (executors.length > 0) return executors[0];
+    }
+    
+    // Fallback to first available
+    return this.executors.values().next().value;
+  }
+}
+
+export const executorRegistry = new ExecutorRegistry();

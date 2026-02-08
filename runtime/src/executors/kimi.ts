@@ -1,25 +1,22 @@
 /**
- * OpenAI Executor
- * Supports GPT-4, GPT-4o, o1, o3 models
+ * Moonshot Kimi Executor
+ * Supports Kimi (Moonshot) models - great for long context
  */
 
 import { BaseExecutor, ExecutorInput, ExecutorResult } from './base';
 
-export class OpenAIExecutor extends BaseExecutor {
-  id = 'openai';
-  name = 'OpenAI';
-  provider = 'openai';
-  models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1', 'o1-mini', 'o3-mini'];
-  defaultModel = 'gpt-4o';
+export class KimiExecutor extends BaseExecutor {
+  id = 'kimi';
+  name = 'Moonshot Kimi';
+  provider = 'moonshot';
+  models = ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'];
+  defaultModel = 'moonshot-v1-32k';
 
-  // Pricing per 1M tokens (USD)
+  // Pricing per 1M tokens (USD) - Competitive pricing
   pricing = {
-    'gpt-4o': { input: 2.50, output: 10.00 },
-    'gpt-4o-mini': { input: 0.15, output: 0.60 },
-    'gpt-4-turbo': { input: 10.00, output: 30.00 },
-    'o1': { input: 15.00, output: 60.00 },
-    'o1-mini': { input: 3.00, output: 12.00 },
-    'o3-mini': { input: 1.10, output: 4.40 },
+    'moonshot-v1-8k': { input: 0.90, output: 0.90 },
+    'moonshot-v1-32k': { input: 1.50, output: 1.50 },
+    'moonshot-v1-128k': { input: 4.20, output: 4.20 },
   };
 
   private apiKey: string;
@@ -27,8 +24,8 @@ export class OpenAIExecutor extends BaseExecutor {
 
   constructor(apiKey?: string) {
     super();
-    this.apiKey = apiKey || process.env.OPENAI_API_KEY || '';
-    this.baseUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
+    this.apiKey = apiKey || process.env.MOONSHOT_API_KEY || '';
+    this.baseUrl = process.env.MOONSHOT_BASE_URL || 'https://api.moonshot.cn/v1';
   }
 
   async execute(input: ExecutorInput): Promise<ExecutorResult> {
@@ -38,31 +35,14 @@ export class OpenAIExecutor extends BaseExecutor {
     if (input.systemPrompt) {
       messages.push({ role: 'system', content: input.systemPrompt });
     }
-    
-    // Handle multimodal input
-    if (input.images && input.images.length > 0) {
-      const content: any[] = [{ type: 'text', text: input.prompt }];
-      for (const image of input.images) {
-        content.push({
-          type: 'image_url',
-          image_url: { url: image.startsWith('http') ? image : `data:image/jpeg;base64,${image}` }
-        });
-      }
-      messages.push({ role: 'user', content });
-    } else {
-      messages.push({ role: 'user', content: input.prompt });
-    }
+    messages.push({ role: 'user', content: input.prompt });
 
     const body: any = {
       model,
       messages,
       max_tokens: input.maxTokens || 4096,
+      temperature: input.temperature ?? 0.7,
     };
-
-    // o1/o3 models don't support temperature
-    if (!model.startsWith('o1') && !model.startsWith('o3')) {
-      body.temperature = input.temperature ?? 0.7;
-    }
 
     if (input.tools && input.tools.length > 0) {
       body.tools = input.tools.map(t => ({
@@ -86,7 +66,7 @@ export class OpenAIExecutor extends BaseExecutor {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`OpenAI API error: ${response.status} ${error}`);
+      throw new Error(`Moonshot API error: ${response.status} ${error}`);
     }
 
     const data = await response.json();
@@ -122,12 +102,9 @@ export class OpenAIExecutor extends BaseExecutor {
       model,
       messages,
       max_tokens: input.maxTokens || 4096,
+      temperature: input.temperature ?? 0.7,
       stream: true,
     };
-
-    if (!model.startsWith('o1') && !model.startsWith('o3')) {
-      body.temperature = input.temperature ?? 0.7;
-    }
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -139,7 +116,7 @@ export class OpenAIExecutor extends BaseExecutor {
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      throw new Error(`Moonshot API error: ${response.status}`);
     }
 
     const reader = response.body?.getReader();
