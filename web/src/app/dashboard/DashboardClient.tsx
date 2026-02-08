@@ -19,12 +19,13 @@ import ServicesList from '@/components/dashboard/ServicesList';
 import OrdersTable from '@/components/dashboard/OrdersTable';
 import EarningsChart from '@/components/dashboard/EarningsChart';
 import ProofOfWorkPanel from '@/components/dashboard/ProofOfWorkPanel';
+import RuntimePanel from '@/components/dashboard/RuntimePanel';
 
 const NEW_AGENT_BANNER_KEY = 'agentL2_newAgentBannerDismissed';
 
 export default function DashboardClient() {
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'orders' | 'analytics' | 'proofofwork' | 'settings' | 'bridge'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'orders' | 'analytics' | 'proofofwork' | 'runtime' | 'settings' | 'bridge'>('overview');
   const { address, isConnecting, error, connect } = useWallet();
   const [agentData, setAgentData] = useState<AgentDetailResponse | null>(null);
   const [orders, setOrders] = useState<OrderSummary[]>([]);
@@ -296,6 +297,23 @@ export default function DashboardClient() {
             {activeTab === 'proofofwork' && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <ProofOfWorkPanel />
+              </motion.div>
+            )}
+
+            {activeTab === 'runtime' && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                {!agentData?.agent || Number(agentData.agent.registeredAt) === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 px-6 text-center max-w-md mx-auto">
+                    <h2 className="text-xl font-bold mb-2 text-ink">Agent not registered</h2>
+                    <p className="text-sm text-ink-muted mb-5">Register your agent to enable autonomous runtime execution.</p>
+                    <Link href="/marketplace/submit" className="btn-primary whitespace-nowrap">
+                      <Zap className="w-4 h-4 shrink-0" />
+                      <span>Register & list service</span>
+                    </Link>
+                  </div>
+                ) : (
+                  <RuntimePanel address={address!} />
+                )}
               </motion.div>
             )}
 

@@ -156,21 +156,21 @@ export class HTTPStorage implements ResultStorage {
 // ============================================================================
 
 export class MemoryStorage implements ResultStorage {
-  private store = new Map<string, ResultData>();
+  private data = new Map<string, ResultData>();
   private counter = 0;
 
   async store(data: ResultData): Promise<string> {
     const id = `mem://${++this.counter}`;
-    this.store.set(id, data);
+    this.data.set(id, data);
     return id;
   }
 
   async retrieve(uri: string): Promise<ResultData | null> {
-    return this.store.get(uri) ?? null;
+    return this.data.get(uri) ?? null;
   }
 
   clear(): void {
-    this.store.clear();
+    this.data.clear();
     this.counter = 0;
   }
 }

@@ -4,7 +4,7 @@
  */
 
 import { createHash, randomBytes } from 'crypto';
-import { Wallet } from 'ethers';
+import { Wallet, verifyMessage } from 'ethers';
 import type { ProofOfWork, ProofType, ProofEvidence, TaskInput } from './types.js';
 
 // ============================================================================
@@ -196,7 +196,7 @@ export class ProofVerifier {
     try {
       const { signature, ...proofData } = proof;
       const message = JSON.stringify(proofData);
-      const recovered = Wallet.verifyMessage(message, signature);
+      const recovered = verifyMessage(message, signature);
       return recovered.toLowerCase() === expectedSigner.toLowerCase();
     } catch {
       return false;

@@ -5,13 +5,13 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import {
   LayoutDashboard, Bot, ShoppingBag, BarChart3, Settings,
-  Wallet, Cpu, ChevronDown, LogOut, Menu, X, Store, ArrowLeftRight, ShieldCheck
+  Wallet, Cpu, ChevronDown, LogOut, Menu, X, Store, ArrowLeftRight, ShieldCheck, Zap
 } from 'lucide-react';
 import { useWallet } from '@/contexts/WalletContext';
 
 interface DashboardNavProps {
   activeTab: string;
-  setActiveTab: (tab: 'overview' | 'services' | 'orders' | 'analytics' | 'proofofwork' | 'settings' | 'bridge') => void;
+  setActiveTab: (tab: 'overview' | 'services' | 'orders' | 'analytics' | 'proofofwork' | 'runtime' | 'settings' | 'bridge') => void;
   isConnected: boolean;
   address: string | null;
 }
@@ -20,6 +20,7 @@ const navItems = [
   { id: 'overview' as const, icon: LayoutDashboard, label: 'Overview' },
   { id: 'services' as const, icon: Bot, label: 'Services' },
   { id: 'orders' as const, icon: ShoppingBag, label: 'Orders' },
+  { id: 'runtime' as const, icon: Zap, label: 'Runtime' },
   { id: 'analytics' as const, icon: BarChart3, label: 'Analytics' },
   { id: 'proofofwork' as const, icon: ShieldCheck, label: 'Proof of work' },
   { id: 'bridge' as const, icon: ArrowLeftRight, label: 'Bridge' },

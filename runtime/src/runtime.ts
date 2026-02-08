@@ -59,6 +59,7 @@ export class AgentRuntime {
   
   private running = false;
   private pollTimer?: ReturnType<typeof setInterval>;
+  private heartbeatTimer?: ReturnType<typeof setInterval>;
   private processingOrders = new Set<string>();
   private processedOrders = new Set<string>();
 
@@ -147,6 +148,9 @@ export class AgentRuntime {
     // Start polling for orders
     this.startPolling();
 
+    // Start heartbeat for dashboard
+    this.startHeartbeat();
+
     // Process any existing pending orders
     await this.processExistingOrders();
 
@@ -165,6 +169,11 @@ export class AgentRuntime {
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = undefined;
+    }
+
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = undefined;
     }
 
     this.marketplace.removeAllListeners();
@@ -204,6 +213,42 @@ export class AgentRuntime {
       if (!this.running) return;
       await this.pollOrders();
     }, interval);
+  }
+
+  private startHeartbeat(): void {
+    // Send heartbeat every 30 seconds to keep dashboard status fresh
+    if (!this.config.webhookUrl) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        const status = await this.getStatus();
+        await fetch(this.config.webhookUrl!, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            address: this.address,
+            status: {
+              ...status,
+              config: {
+                pollInterval: this.config.pollInterval ?? 5000,
+                maxConcurrent: this.config.maxConcurrent ?? 5,
+                autoComplete: this.config.autoComplete ?? true,
+                hasOpenAI: !!this.config.openaiApiKey,
+                executorCount: this.executors.list().length,
+              },
+            },
+          }),
+        });
+      } catch {
+        // Ignore heartbeat errors
+      }
+    };
+
+    // Send initial heartbeat
+    sendHeartbeat();
+
+    // Then every 30 seconds
+    this.heartbeatTimer = setInterval(sendHeartbeat, 30000);
   }
 
   private async pollOrders(): Promise<void> {
@@ -423,10 +468,25 @@ export class AgentRuntime {
 
   private async notifyWebhook(event: RuntimeEvent): Promise<void> {
     try {
+      // Send event with current status
+      const status = await this.getStatus();
       await fetch(this.config.webhookUrl!, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(event),
+        body: JSON.stringify({
+          address: this.address,
+          event,
+          status: {
+            ...status,
+            config: {
+              pollInterval: this.config.pollInterval ?? 5000,
+              maxConcurrent: this.config.maxConcurrent ?? 5,
+              autoComplete: this.config.autoComplete ?? true,
+              hasOpenAI: !!this.config.openaiApiKey,
+              executorCount: this.executors.list().length,
+            },
+          },
+        }),
       });
     } catch {
       // Ignore webhook errors
