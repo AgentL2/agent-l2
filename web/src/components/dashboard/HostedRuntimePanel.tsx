@@ -24,6 +24,33 @@ interface HostedRuntimePanelProps {
   address: string;
 }
 
+// LocalStorage key for persisting hosted agents (MVP workaround)
+const HOSTED_AGENTS_KEY = 'agentl2_hosted_agents';
+
+function getLocalAgents(address: string): HostedAgent[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem(HOSTED_AGENTS_KEY);
+    if (!stored) return [];
+    const all = JSON.parse(stored) as Record<string, HostedAgent[]>;
+    return all[address.toLowerCase()] || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalAgents(address: string, agents: HostedAgent[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    const stored = localStorage.getItem(HOSTED_AGENTS_KEY);
+    const all = stored ? JSON.parse(stored) : {};
+    all[address.toLowerCase()] = agents;
+    localStorage.setItem(HOSTED_AGENTS_KEY, JSON.stringify(all));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export default function HostedRuntimePanel({ address }: HostedRuntimePanelProps) {
   const [agents, setAgents] = useState<HostedAgent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,11 +62,24 @@ export default function HostedRuntimePanel({ address }: HostedRuntimePanelProps)
 
   const fetchAgents = useCallback(async () => {
     try {
+      // Try API first
       const data = await getHostedAgents(address);
-      setAgents(data);
+      if (data.length > 0) {
+        setAgents(data);
+        saveLocalAgents(address, data); // Cache for persistence
+      } else {
+        // Fall back to localStorage if API returns empty
+        const local = getLocalAgents(address);
+        setAgents(local);
+      }
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch agents');
+      // On error, try localStorage
+      const local = getLocalAgents(address);
+      setAgents(local);
+      if (local.length === 0) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch agents');
+      }
     } finally {
       setLoading(false);
     }
@@ -191,14 +231,18 @@ function EmptyState({ onDeploy }: { onDeploy: () => void }) {
       <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-surface-elevated border border-border flex items-center justify-center">
         <Cpu className="w-10 h-10 text-accent opacity-50" />
       </div>
-      <h3 className="text-2xl font-bold mb-2 text-ink">No Hosted Agents Yet</h3>
+      <h3 className="text-2xl font-bold mb-2 text-ink">No Hosted Agents</h3>
       <p className="text-ink-muted max-w-md mx-auto mb-6">
-        Deploy your first agent to start earning. Choose from templates or connect your own webhook.
+        Deploy an agent to start earning. Your agent data is saved in your browser.
       </p>
-      <button onClick={onDeploy} className="btn-primary">
+      <button onClick={onDeploy} className="btn-primary mb-4">
         <Plus className="w-4 h-4" />
-        Deploy Your First Agent
+        Deploy Agent
       </button>
+      <p className="text-xs text-ink-subtle max-w-sm mx-auto">
+        Note: In this MVP, hosted agent data is stored locally in your browser. 
+        Production will use persistent database storage.
+      </p>
 
       {/* Template Preview */}
       <div className="mt-12 pt-8 border-t border-border">

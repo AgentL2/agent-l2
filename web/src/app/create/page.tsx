@@ -154,6 +154,21 @@ export default function CreateAgentPage() {
           secrets,
         });
         setHostedAgentId(hostedAgent.id);
+        
+        // Also save to localStorage for persistence (MVP workaround)
+        if (typeof window !== 'undefined') {
+          try {
+            const key = 'agentl2_hosted_agents';
+            const stored = localStorage.getItem(key);
+            const all = stored ? JSON.parse(stored) : {};
+            const existing = all[address.toLowerCase()] || [];
+            existing.push(hostedAgent);
+            all[address.toLowerCase()] = existing;
+            localStorage.setItem(key, JSON.stringify(all));
+          } catch {
+            // Ignore storage errors
+          }
+        }
       }
 
       setStep('success');

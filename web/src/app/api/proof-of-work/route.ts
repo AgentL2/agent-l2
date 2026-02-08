@@ -21,12 +21,25 @@ export async function GET(request: NextRequest) {
     const agentFilter = searchParams.get('agent'); // optional: filter by seller address
 
     const currentBlock = await provider.getBlockNumber();
-    const fromBlock = Math.max(0, Number(currentBlock) - 50000);
-    const logs = await provider.getLogs({
-      address: getChainConfig().marketplaceAddress,
-      fromBlock: BigInt(fromBlock),
-      toBlock: currentBlock,
-    });
+    // Monad/testnet limits eth_getLogs to 100 blocks, so we batch
+    const MAX_RANGE = 100;
+    const LOOKBACK = 5000; // How far back to search (in batches of 100)
+    const fromBlock = Math.max(0, Number(currentBlock) - LOOKBACK);
+    
+    const logs: ethers.Log[] = [];
+    for (let start = fromBlock; start < Number(currentBlock); start += MAX_RANGE) {
+      const end = Math.min(start + MAX_RANGE - 1, Number(currentBlock));
+      try {
+        const batchLogs = await provider.getLogs({
+          address: getChainConfig().marketplaceAddress,
+          fromBlock: BigInt(start),
+          toBlock: BigInt(end),
+        });
+        logs.push(...batchLogs);
+      } catch {
+        // Skip failed batches
+      }
+    }
 
     const orderIds: string[] = [];
     for (const log of logs) {

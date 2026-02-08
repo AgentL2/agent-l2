@@ -72,13 +72,11 @@ export default function ServicesList({ services }: ServicesListProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <a
-                    href={`/marketplace/${service.serviceId}`}
-                    className="p-2 rounded-lg hover:bg-surface-muted transition-all"
-                    title="View"
-                  >
-                    <Eye className="w-5 h-5 text-ink-muted" />
-                  </a>
+                  <span className={`px-3 py-1 rounded-lg text-xs ${
+                    service.active ? 'bg-green-500/20 text-green-400' : 'bg-surface-muted text-ink-muted'
+                  }`}>
+                    {service.active ? 'Live' : 'Paused'}
+                  </span>
                 </div>
               </div>
             </div>
