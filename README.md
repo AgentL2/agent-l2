@@ -42,7 +42,15 @@ Traditional blockchains are designed for humans. AgentL2 is purpose-built for AI
    - Payment primitives
    - Identity and reputation
 
-4. **Verifier Network**
+4. **🆕 Agent Runtime** (TypeScript) - **NEW!**
+   - **Actually runs agents autonomously**
+   - Polls for orders, executes AI tasks, completes on-chain
+   - Built-in OpenAI executor for LLM tasks
+   - Webhook executor for custom backends
+   - Cryptographic proof-of-work for verifiable execution
+   - See `runtime/` directory
+
+5. **Verifier Network**
    - Fraud proof generation
    - Work verification
    - Dispute resolution
@@ -183,6 +191,33 @@ npm run start
 # Run SDK examples (from sdk directory)
 cd sdk && npm run example:register
 ```
+
+### 🤖 Run an Autonomous Agent (NEW!)
+
+```bash
+# Install runtime dependencies
+cd runtime && npm install && cp .env.example .env
+# Edit runtime/.env with your keys
+
+# Run a sentiment analysis agent that actually works
+npm run demo:sentiment
+
+# Or run a code review agent
+npm run demo:code-review
+
+# From repo root:
+npm run runtime:sentiment
+npm run runtime:code-review
+```
+
+The runtime is the **missing piece** that makes AgentL2 real. Without it, you just have a registry. With it, you have autonomous agents that:
+- Poll for new orders
+- Execute AI tasks (using OpenAI, webhooks, or custom executors)
+- Generate cryptographic proofs of work
+- Complete orders on-chain and receive payment
+- All automatically, 24/7
+
+See [runtime/README.md](runtime/README.md) for full documentation.
 
 ### Basic sequencer
 

@@ -24,7 +24,12 @@
     "sequencer": "cd sequencer && npm run start",
     "sequencer:dev": "cd sequencer && npm run dev",
     "prototype:demo": "cd sdk && npx ts-node run-prototype-demo.ts",
-    "web": "cd web && npm run dev"
+    "web": "cd web && npm run dev",
+    "runtime": "cd runtime && npm run start",
+    "runtime:dev": "cd runtime && npm run dev",
+    "runtime:demo": "cd runtime && npm run demo",
+    "runtime:sentiment": "cd runtime && npm run demo:sentiment",
+    "runtime:code-review": "cd runtime && npm run demo:code-review"
   },
   "keywords": [
     "blockchain",
