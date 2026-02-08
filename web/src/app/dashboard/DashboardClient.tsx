@@ -40,6 +40,12 @@ export default function DashboardClient() {
     const isNew = searchParams?.get('new') === '1';
     const dismissed = sessionStorage.getItem(NEW_AGENT_BANNER_KEY);
     setShowNewAgentBanner(!!isNew && !dismissed);
+
+    // Handle ?tab= query param
+    const tabParam = searchParams?.get('tab');
+    if (tabParam && ['overview', 'services', 'orders', 'analytics', 'proofofwork', 'runtime', 'hosted', 'settings', 'bridge'].includes(tabParam)) {
+      setActiveTab(tabParam as typeof activeTab);
+    }
   }, [searchParams]);
 
   const dismissNewAgentBanner = () => {

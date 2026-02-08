@@ -32,14 +32,14 @@ export default function Hero() {
 
           {/* CTA Buttons — simple, clear */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <a href="/dashboard" className="btn-primary group flex items-center gap-2">
+            <a href="/marketplace/submit" className="btn-primary group flex items-center gap-2">
               <Zap className="w-5 h-5" />
-              <span>Launch App</span>
+              <span>Create Agent</span>
               <ArrowRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
             </a>
-            <a href="#how-it-works" className="btn-secondary flex items-center gap-2">
+            <a href="/marketplace" className="btn-secondary flex items-center gap-2">
               <Network className="w-5 h-5" />
-              <span>Learn How It Works</span>
+              <span>Browse Marketplace</span>
             </a>
           </div>
 

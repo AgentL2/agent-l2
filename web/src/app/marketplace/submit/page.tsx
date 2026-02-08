@@ -3,9 +3,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowLeft, Upload, Code, FileText, DollarSign, Tag, Globe,
-  Github, CheckCircle2, AlertCircle, Cpu, Zap, Shield, Image,
-  Plus, X, ChevronRight, Loader2, Rocket, Wallet
+  ArrowLeft, DollarSign, CheckCircle2, AlertCircle, Zap, Cloud, Code,
+  Plus, X, ChevronRight, Loader2, Rocket, Wallet, Terminal, Settings
 } from 'lucide-react';
 
 function shortErrorMessage(message: string): string {
@@ -24,41 +23,29 @@ import {
   registerAgent as doRegisterAgent,
   registerService as doRegisterService,
 } from '@/lib/writes';
-import { LabelWithTooltip, Tooltip } from '@/components/UI/Tooltip';
+import { EXECUTOR_TEMPLATES, type ExecutorTemplate } from '@/lib/hosted';
+
+type ExecutionMode = 'hosted' | 'self-hosted' | 'decide-later';
 
 const categories = [
-  { id: 'text', name: 'Text & NLP', icon: '💬' },
-  { id: 'code', name: 'Code & Dev', icon: '💻' },
-  { id: 'vision', name: 'Vision & Image', icon: '👁️' },
-  { id: 'data', name: 'Data & Analytics', icon: '📊' },
-  { id: 'audio', name: 'Audio & Speech', icon: '🎵' },
-  { id: 'other', name: 'Other', icon: '🔮' },
-];
-
-const pricingModels = [
-  { id: 'per-request', name: 'Per Request', description: 'Charge per API call' },
-  { id: 'per-token', name: 'Per Token', description: 'Charge per 1K tokens processed' },
-  { id: 'per-minute', name: 'Per Minute', description: 'Charge per minute of processing' },
-  { id: 'flat', name: 'Flat Rate', description: 'Fixed price per job' },
+  { id: 'text', name: 'Text & NLP', icon: '💬', serviceType: 'text-generation' },
+  { id: 'code', name: 'Code & Dev', icon: '💻', serviceType: 'code-review' },
+  { id: 'vision', name: 'Vision & Image', icon: '👁️', serviceType: 'image-analysis' },
+  { id: 'data', name: 'Data & Analytics', icon: '📊', serviceType: 'data-extraction' },
+  { id: 'audio', name: 'Audio & Speech', icon: '🎵', serviceType: 'audio-processing' },
+  { id: 'other', name: 'Other', icon: '🔮', serviceType: 'custom' },
 ];
 
 export default function SubmitAgentPage() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [executionMode, setExecutionMode] = useState<ExecutionMode | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<ExecutorTemplate | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    longDescription: '',
     category: '',
-    tags: [] as string[],
-    newTag: '',
     price: '',
-    pricingModel: 'per-request',
-    github: '',
-    website: '',
-    docs: '',
-    contractAddress: '',
-    apiEndpoint: '',
     icon: '🤖',
   });
 
@@ -66,24 +53,26 @@ export default function SubmitAgentPage() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const addTag = () => {
-    if (formData.newTag && formData.tags.length < 5) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, prev.newTag.toLowerCase()],
-        newTag: ''
-      }));
-    }
-  };
-
-  const removeTag = (tag: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(t => t !== tag)
-    }));
-  };
-
   const { address, isConnecting, error: walletError, connect, getSigner } = useWallet();
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [txHash, setTxHash] = useState<string | null>(null);
+  const [newServiceId, setNewServiceId] = useState<string | null>(null);
+  const [isFirstTimeAgent, setIsFirstTimeAgent] = useState(false);
+
+  // Check if agent already registered
+  const [isAgentRegistered, setIsAgentRegistered] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!address) {
+      setIsAgentRegistered(null);
+      return;
+    }
+    getAgent(address)
+      .then(() => setIsAgentRegistered(true))
+      .catch((e) => {
+        if (e instanceof ApiError && e.status === 404) setIsAgentRegistered(false);
+        else setIsAgentRegistered(null);
+      });
+  }, [address]);
 
   const handleSubmit = useCallback(async () => {
     if (!address) {
@@ -102,31 +91,24 @@ export default function SubmitAgentPage() {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const metadataURI = formData.longDescription?.trim() || formData.description?.trim() || '';
-      const serviceType = formData.category || formData.name || 'service';
+      const serviceType = categories.find(c => c.id === formData.category)?.serviceType || formData.category || 'service';
       const priceWei = ethers.parseEther((formData.price || '0').trim());
       if (priceWei === 0n) throw new Error('Price must be greater than 0');
 
-      let agentRegistered = true;
-      try {
-        await getAgent(address);
-      } catch (e) {
-        if (e instanceof ApiError && e.status === 404) agentRegistered = false;
-        else throw e;
-      }
-
-      if (!agentRegistered) {
+      // Register agent if not already
+      if (!isAgentRegistered) {
         const did = generateDID(address);
-        await doRegisterAgent(signer, address, did, metadataURI || 'ipfs://');
+        await doRegisterAgent(signer, address, did, formData.description || 'ipfs://');
         setIsFirstTimeAgent(true);
       }
 
+      // Register service
       const { serviceId, txHash } = await doRegisterService(
         signer,
         address,
         serviceType,
         priceWei,
-        formData.description?.trim() || metadataURI || ''
+        formData.description?.trim() || ''
       );
       setTxHash(txHash);
       setNewServiceId(serviceId);
@@ -136,12 +118,7 @@ export default function SubmitAgentPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [address, connect, getSigner, formData.longDescription, formData.description, formData.category, formData.name, formData.price]);
-
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const [newServiceId, setNewServiceId] = useState<string | null>(null);
-  const [isFirstTimeAgent, setIsFirstTimeAgent] = useState(false);
+  }, [address, connect, getSigner, formData, isAgentRegistered]);
 
   useEffect(() => {
     if (!submitError) return;
@@ -150,8 +127,21 @@ export default function SubmitAgentPage() {
   }, [submitError]);
 
   const icons = ['🤖', '🔮', '💻', '📊', '🎨', '🔍', '⚡', '🧠', '🎯', '🚀', '💡', '🔒'];
-
   const showConnectPrompt = !address && step < 4;
+
+  // If user selects hosted and picks a template, pre-fill form
+  const handleSelectTemplate = (template: ExecutorTemplate) => {
+    setSelectedTemplate(template);
+    const cat = categories.find(c => c.serviceType === template.serviceType) || categories[5];
+    setFormData(prev => ({
+      ...prev,
+      name: `My ${template.name} Agent`,
+      description: template.description,
+      category: cat.id,
+      icon: template.icon,
+    }));
+    setStep(2);
+  };
 
   return (
     <div className="min-h-screen bg-surface text-ink">
@@ -161,7 +151,7 @@ export default function SubmitAgentPage() {
           <div className="flex items-center justify-between">
             <Link href="/marketplace" className="flex items-center gap-2 text-ink-muted hover:text-accent transition-colors">
               <ArrowLeft className="w-5 h-5" />
-              <span>Back to Marketplace</span>
+              <span>Marketplace</span>
             </Link>
             <div className="flex items-center gap-4">
               {!address ? (
@@ -174,10 +164,15 @@ export default function SubmitAgentPage() {
                   {isConnecting ? 'Connecting…' : 'Connect Wallet'}
                 </button>
               ) : (
-                <span className="text-sm text-ink-subtle font-mono">{address.slice(0, 6)}…{address.slice(-4)}</span>
-              )}
-              {step < 4 && (
-                <span className="text-sm text-ink-subtle">Step {step} of 3</span>
+                <div className="flex items-center gap-2">
+                  {isAgentRegistered === true && (
+                    <span className="px-2 py-1 text-xs rounded-full bg-green-500/20 text-green-400">Agent Active</span>
+                  )}
+                  {isAgentRegistered === false && (
+                    <span className="px-2 py-1 text-xs rounded-full bg-yellow-500/20 text-yellow-400">New Agent</span>
+                  )}
+                  <span className="text-sm text-ink-subtle font-mono">{address.slice(0, 6)}…{address.slice(-4)}</span>
+                </div>
               )}
             </div>
           </div>
@@ -195,7 +190,7 @@ export default function SubmitAgentPage() {
               <Wallet className="w-8 h-8 text-accent" />
               <div>
                 <h3 className="font-semibold text-ink">Connect your wallet</h3>
-                <p className="text-sm text-ink-muted">You need a connected wallet to register your agent and list services on-chain.</p>
+                <p className="text-sm text-ink-muted">Your wallet becomes your agent identity on AgentL2.</p>
               </div>
               <button onClick={() => connect()} disabled={isConnecting} className="btn-primary ml-auto">
                 {isConnecting ? 'Connecting…' : 'Connect'}
@@ -204,93 +199,152 @@ export default function SubmitAgentPage() {
           </motion.div>
         )}
 
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
-        >
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border bg-surface-muted mb-6">
-            <Rocket className="w-4 h-4 text-accent" />
-            <span className="text-sm font-semibold text-accent">Submit Your Agent</span>
-          </div>
-          <h1 className="text-4xl font-bold mb-4 text-ink">
-            {step === 4 ? 'Submission Complete!' : 'List Your Agent on the Marketplace'}
-          </h1>
-          <p className="text-ink-muted max-w-xl mx-auto">
-            {step === 4 
-              ? 'Your agent and service are registered on-chain.'
-              : 'Share your AI agent with the network and start earning.'}
-          </p>
-        </motion.div>
+        {/* Step 1: Choose Execution Mode */}
+        {step === 1 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="text-center mb-10">
+              <h1 className="text-4xl font-bold mb-4 text-ink">Create Your Agent</h1>
+              <p className="text-ink-muted max-w-xl mx-auto">
+                {isAgentRegistered === false 
+                  ? "This will register your wallet as an agent on AgentL2 and list your first service."
+                  : "List a new service for your agent on the marketplace."}
+              </p>
+            </div>
 
-        {/* Step indicator — modern brutalism: equal columns, square nodes, thick line */}
-        {step < 4 && (
-          <div className="mb-12 max-w-xl mx-auto px-4">
-            {/* Thick horizontal line (runs through center of step nodes) */}
-            <div className="relative h-12">
-              <div className="absolute inset-x-0 top-1/2 left-0 right-0 h-1 -translate-y-1/2 bg-border" aria-hidden />
-            </div>
-            <div className="relative grid grid-cols-3 gap-0 -mt-12">
-              {[
-                { num: 1, label: 'Basic Info' },
-                { num: 2, label: 'Pricing & Links' },
-                { num: 3, label: 'Review' },
-              ].map(({ num, label }) => {
-                const isActive = step === num;
-                const isDone = step > num;
-                const isPending = step < num;
-                return (
-                  <div key={num} className="flex flex-col items-center">
-                    <div
-                      className={`
-                        relative z-10 w-12 h-12 flex items-center justify-center font-bold text-lg border-2 transition-colors
-                        ${isDone ? 'bg-accent border-accent text-surface' : ''}
-                        ${isActive ? 'bg-accent border-accent text-surface' : ''}
-                        ${isPending ? 'bg-surface border-border text-ink-subtle' : ''}
-                      `}
-                      style={{ borderRadius: 0 }}
-                    >
-                      {isDone ? <CheckCircle2 className="w-6 h-6" /> : num}
+            <div className="mb-8">
+              <h2 className="text-lg font-semibold text-ink mb-4 text-center">How will your agent run?</h2>
+              <div className="grid md:grid-cols-2 gap-4">
+                {/* Hosted Option */}
+                <button
+                  onClick={() => setExecutionMode('hosted')}
+                  className={`card text-left transition-all ${
+                    executionMode === 'hosted' ? 'border-accent bg-accent/5' : 'hover:border-border-light'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-accent/20 flex items-center justify-center shrink-0">
+                      <Cloud className="w-6 h-6 text-accent" />
                     </div>
-                    <span
-                      className={`
-                        mt-3 text-xs font-semibold uppercase tracking-wider text-center
-                        ${isActive || isDone ? 'text-ink' : 'text-ink-subtle'}
-                      `}
-                    >
-                      {label}
-                    </span>
+                    <div>
+                      <h3 className="font-semibold text-ink mb-1 flex items-center gap-2">
+                        Hosted by AgentL2
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-400">Recommended</span>
+                      </h3>
+                      <p className="text-sm text-ink-muted mb-3">
+                        We run your agent 24/7. Just pick a template and enter your API key.
+                      </p>
+                      <ul className="text-xs text-ink-subtle space-y-1">
+                        <li>✓ No server setup required</li>
+                        <li>✓ One-click deployment</li>
+                        <li>✓ Automatic order processing</li>
+                        <li>✓ 5% platform fee on earnings</li>
+                      </ul>
+                    </div>
                   </div>
-                );
-              })}
+                </button>
+
+                {/* Self-Hosted Option */}
+                <button
+                  onClick={() => { setExecutionMode('self-hosted'); setStep(2); }}
+                  className={`card text-left transition-all ${
+                    executionMode === 'self-hosted' ? 'border-accent bg-accent/5' : 'hover:border-border-light'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-surface-muted border border-border flex items-center justify-center shrink-0">
+                      <Terminal className="w-6 h-6 text-ink-muted" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-ink mb-1">Self-Hosted (Developers)</h3>
+                      <p className="text-sm text-ink-muted mb-3">
+                        Run the runtime yourself. Full control over execution.
+                      </p>
+                      <ul className="text-xs text-ink-subtle space-y-1">
+                        <li>✓ Custom executors</li>
+                        <li>✓ Run on your infrastructure</li>
+                        <li>✓ No platform execution fee</li>
+                        <li>✓ Requires technical setup</li>
+                      </ul>
+                    </div>
+                  </div>
+                </button>
+              </div>
             </div>
-          </div>
+
+            {/* Hosted Templates */}
+            <AnimatePresence>
+              {executionMode === 'hosted' && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                >
+                  <h2 className="text-lg font-semibold text-ink mb-4">Choose a Template</h2>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    {EXECUTOR_TEMPLATES.map((template) => (
+                      <button
+                        key={template.id}
+                        onClick={() => handleSelectTemplate(template)}
+                        className="card text-left hover:border-accent/50 transition-all group p-4"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-3xl">{template.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-ink group-hover:text-accent transition-colors">
+                                {template.name}
+                              </span>
+                              {template.popular && (
+                                <span className="px-1.5 py-0.5 text-xs rounded bg-accent/20 text-accent">Popular</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-ink-muted line-clamp-1">{template.description}</p>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-ink-muted group-hover:text-accent shrink-0" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
         )}
 
-        {/* Step 1: Basic Info */}
-        {step === 1 && (
+        {/* Step 2: Service Details */}
+        {step === 2 && (
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             className="space-y-8"
           >
+            <div className="flex items-center gap-2 mb-6">
+              <button onClick={() => setStep(1)} className="btn-ghost p-2">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-2xl font-bold text-ink">Service Details</h1>
+                <p className="text-sm text-ink-muted">
+                  {executionMode === 'hosted' && selectedTemplate
+                    ? `Setting up ${selectedTemplate.name}`
+                    : 'Define your service offering'}
+                </p>
+              </div>
+            </div>
+
             <div className="card">
-              <h2 className="text-2xl font-bold mb-6">Basic Information</h2>
-              
               {/* Icon Selection */}
               <div className="mb-6">
-                <LabelWithTooltip
-                  label="Agent Icon"
-                  tooltip="Choose an emoji that represents your agent. Shown on the marketplace and your agent card."
-                />
-                <div className="mb-3" />
-                <div className="flex flex-wrap gap-3">
+                <label className="block text-sm font-medium text-ink-muted mb-3">Icon</label>
+                <div className="flex flex-wrap gap-2">
                   {icons.map((icon) => (
                     <button
                       key={icon}
                       onClick={() => updateForm('icon', icon)}
-                      className={`w-14 h-14 rounded-xl text-3xl flex items-center justify-center transition-all ${
+                      className={`w-12 h-12 rounded-xl text-2xl flex items-center justify-center transition-all ${
                         formData.icon === icon
                           ? 'bg-accent/20 border-2 border-accent'
                           : 'bg-surface-muted border-2 border-transparent hover:border-border'
@@ -304,168 +358,55 @@ export default function SubmitAgentPage() {
 
               {/* Name */}
               <div className="mb-6">
-                <LabelWithTooltip
-                  label="Agent Name *"
-                  tooltip="Public name for your agent on the marketplace. Keep it clear and recognizable (e.g. SentimentAnalyzer Pro)."
-                />
+                <label className="block text-sm font-medium text-ink-muted mb-2">Service Name *</label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => updateForm('name', e.target.value)}
-                  placeholder="e.g., SentimentAnalyzer Pro"
+                  placeholder="e.g., Sentiment Analysis Pro"
                   className="input-field"
                   maxLength={50}
                 />
-                <p className="text-xs text-ink-subtle mt-1">{formData.name.length}/50 characters</p>
               </div>
 
               {/* Category */}
               <div className="mb-6">
-                <LabelWithTooltip
-                  label="Category *"
-                  tooltip="Helps buyers find your agent. Choose the best fit (e.g. Text & NLP for language models, Code & Dev for coding assistants)."
-                />
-                <div className="mb-3" />
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <label className="block text-sm font-medium text-ink-muted mb-3">Category *</label>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {categories.map((cat) => (
                     <button
                       key={cat.id}
                       onClick={() => updateForm('category', cat.id)}
-                      className={`p-4 rounded-xl text-left transition-all ${
+                      className={`p-3 rounded-xl text-center transition-all ${
                         formData.category === cat.id
                           ? 'bg-accent/20 border-2 border-accent'
                           : 'bg-surface-muted border-2 border-transparent hover:border-border'
                       }`}
                     >
-                      <div className="text-2xl mb-2">{cat.icon}</div>
-                      <div className="font-medium">{cat.name}</div>
+                      <div className="text-xl mb-1">{cat.icon}</div>
+                      <div className="text-xs">{cat.name}</div>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Short Description */}
+              {/* Description */}
               <div className="mb-6">
-                <LabelWithTooltip
-                  label="Short Description *"
-                  tooltip="One or two sentences shown in search and listing cards. Summarize what your agent does and who it's for."
-                />
+                <label className="block text-sm font-medium text-ink-muted mb-2">Description *</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => updateForm('description', e.target.value)}
-                  placeholder="A brief description of what your agent does (displayed in search results)"
+                  placeholder="What does your agent do? Who is it for?"
                   className="input-field"
                   rows={3}
-                  maxLength={200}
+                  maxLength={300}
                 />
-                <p className="text-xs text-ink-subtle mt-1">{formData.description.length}/200 characters</p>
-              </div>
-
-              {/* Long Description */}
-              <div className="mb-6">
-                <LabelWithTooltip
-                  label="Full Description"
-                  tooltip="Detailed description for your agent's page: features, use cases, inputs/outputs. Markdown is supported. Stored as metadata reference on-chain."
-                />
-                <textarea
-                  value={formData.longDescription}
-                  onChange={(e) => updateForm('longDescription', e.target.value)}
-                  placeholder="Detailed description with features, use cases, and technical specifications. Markdown supported."
-                  className="input-field"
-                  rows={8}
-                />
-              </div>
-
-              {/* Tags */}
-              <div>
-                <LabelWithTooltip
-                  label="Tags (up to 5)"
-                  tooltip="Keywords that help discovery (e.g. nlp, api, real-time). Add a tag and press Enter or click +."
-                />
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {formData.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-3 py-1 bg-accent/20 text-accent rounded-full text-sm flex items-center gap-2"
-                    >
-                      <span>{tag}</span>
-                      <button onClick={() => removeTag(tag)} className="hover:text-ink">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    value={formData.newTag}
-                    onChange={(e) => updateForm('newTag', e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                    placeholder="Add a tag"
-                    className="input-field flex-1"
-                    maxLength={20}
-                  />
-                  <button onClick={addTag} className="btn-secondary px-4">
-                    <Plus className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                onClick={() => setStep(2)}
-                disabled={!formData.name || !formData.category || !formData.description}
-                className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span>Continue</span>
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Step 2: Pricing & Links */}
-        {step === 2 && (
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="space-y-8"
-          >
-            <div className="card">
-              <h2 className="text-2xl font-bold mb-6">Pricing & Configuration</h2>
-
-              {/* Pricing Model */}
-              <div className="mb-6">
-                <LabelWithTooltip
-                  label="Pricing Model *"
-                  tooltip="How you charge: per request (each API call), per token (e.g. 1K tokens), per minute, or flat rate per job."
-                />
-                <div className="mb-3" />
-                <div className="grid grid-cols-2 gap-3">
-                  {pricingModels.map((model) => (
-                    <button
-                      key={model.id}
-                      onClick={() => updateForm('pricingModel', model.id)}
-                      className={`p-4 rounded-xl text-left transition-all ${
-                        formData.pricingModel === model.id
-                          ? 'bg-accent/20 border-2 border-accent'
-                          : 'bg-surface-muted border-2 border-transparent hover:border-border'
-                      }`}
-                    >
-                      <div className="font-medium mb-1">{model.name}</div>
-                      <div className="text-xs text-ink-subtle">{model.description}</div>
-                    </button>
-                  ))}
-                </div>
+                <p className="text-xs text-ink-subtle mt-1">{formData.description.length}/300</p>
               </div>
 
               {/* Price */}
-              <div className="mb-6">
-                <LabelWithTooltip
-                  label="Price (ETH) *"
-                  tooltip="Price per unit in ETH. A 2.5% platform fee applies; you receive the remainder when orders complete."
-                />
+              <div>
+                <label className="block text-sm font-medium text-ink-muted mb-2">Price per Request (ETH) *</label>
                 <div className="relative">
                   <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-subtle" />
                   <input
@@ -479,210 +420,151 @@ export default function SubmitAgentPage() {
                   />
                 </div>
                 <p className="text-xs text-ink-subtle mt-1">
-                  Platform fee: 2.5% • You receive: {formData.price ? (parseFloat(formData.price) * 0.975).toFixed(6) : '0'} ETH per {formData.pricingModel.replace('-', ' ')}
+                  Platform fee: 2.5% • You receive: {formData.price ? (parseFloat(formData.price) * 0.975).toFixed(6) : '0'} ETH per request
                 </p>
-              </div>
-
-              {/* Agent = connected wallet; show for clarity */}
-              {address && (
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-ink-muted mb-2">Agent (your wallet)</label>
-                  <input
-                    type="text"
-                    value={address}
-                    readOnly
-                    className="input-field font-mono text-ink-subtle bg-surface-muted"
-                  />
-                </div>
-              )}
-
-              {/* API Endpoint */}
-              <div className="mb-6">
-                <LabelWithTooltip
-                  label="API Endpoint"
-                  tooltip="Optional. Your service URL for buyers or autonomous workers that call your API to fulfill orders."
-                />
-                <input
-                  type="url"
-                  value={formData.apiEndpoint}
-                  onChange={(e) => updateForm('apiEndpoint', e.target.value)}
-                  placeholder="https://api.youragent.com/v1"
-                  className="input-field"
-                />
               </div>
             </div>
 
-            <div className="card">
-              <h2 className="text-2xl font-bold mb-6">Links & Resources</h2>
-
-              {/* GitHub */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-ink-muted mb-2">
-                  <span className="inline-flex items-center gap-2">
-                    <Github className="w-4 h-4" />
-                    <span>GitHub Repository</span>
-                    <Tooltip content="Link to your agent's source code. Helps builders trust and integrate." iconTrigger side="top" />
-                  </span>
-                </label>
-                <input
-                  type="url"
-                  value={formData.github}
-                  onChange={(e) => updateForm('github', e.target.value)}
-                  placeholder="https://github.com/AgentL2/agent-l2"
-                  className="input-field"
-                />
-              </div>
-
-              {/* Website */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-ink-muted mb-2">
-                  <span className="inline-flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
-                    <span>Website</span>
-                    <Tooltip content="Your agent's or project homepage. Optional but builds trust." iconTrigger side="top" />
-                  </span>
-                </label>
-                <input
-                  type="url"
-                  value={formData.website}
-                  onChange={(e) => updateForm('website', e.target.value)}
-                  placeholder="https://youragent.com"
-                  className="input-field"
-                />
-              </div>
-
-              {/* Documentation */}
-              <div>
-                <label className="block text-sm font-medium text-ink-muted mb-2">
-                  <span className="inline-flex items-center gap-2">
-                    <FileText className="w-4 h-4" />
-                    <span>Documentation URL</span>
-                    <Tooltip content="Link to API docs or usage guide. Buyers use this to integrate with your service." iconTrigger side="top" />
-                  </span>
-                </label>
-                <input
-                  type="url"
-                  value={formData.docs}
-                  onChange={(e) => updateForm('docs', e.target.value)}
-                  placeholder="https://docs.youragent.com"
-                  className="input-field"
-                />
+            {/* Execution Mode Summary */}
+            <div className={`card ${executionMode === 'hosted' ? 'bg-accent/5 border-accent/30' : 'bg-surface-muted'}`}>
+              <div className="flex items-center gap-3">
+                {executionMode === 'hosted' ? (
+                  <>
+                    <Cloud className="w-6 h-6 text-accent" />
+                    <div>
+                      <h4 className="font-medium text-ink">Hosted Execution</h4>
+                      <p className="text-sm text-ink-muted">
+                        {selectedTemplate 
+                          ? `Using ${selectedTemplate.name} template. You'll configure API keys after registration.`
+                          : "We'll run your agent 24/7."}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Terminal className="w-6 h-6 text-ink-muted" />
+                    <div>
+                      <h4 className="font-medium text-ink">Self-Hosted</h4>
+                      <p className="text-sm text-ink-muted">You'll run the runtime yourself. See docs after registration.</p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
             <div className="flex justify-between">
-              <button onClick={() => setStep(1)} className="btn-ghost">
-                ← Back
-              </button>
+              <button onClick={() => setStep(1)} className="btn-ghost">← Back</button>
               <button
                 onClick={() => setStep(3)}
-                disabled={!formData.price || !address}
-                className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!formData.name || !formData.category || !formData.description || !formData.price}
+                className="btn-primary flex items-center gap-2 disabled:opacity-50"
               >
-                <span>Continue</span>
-                <ChevronRight className="w-5 h-5" />
+                Review <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </motion.div>
         )}
 
-        {/* Step 3: Review */}
+        {/* Step 3: Review & Submit */}
         {step === 3 && (
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             className="space-y-8"
           >
-            <div className="card">
-              <h2 className="text-2xl font-bold mb-6">Review Your Submission</h2>
+            <div className="flex items-center gap-2 mb-6">
+              <button onClick={() => setStep(2)} className="btn-ghost p-2">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-2xl font-bold text-ink">Review & Submit</h1>
+                <p className="text-sm text-ink-muted">Confirm details before registering on-chain</p>
+              </div>
+            </div>
 
-              {/* Preview Card */}
-              <div className="p-6 bg-surface-muted border border-border rounded-xl mb-6">
-                <div className="flex items-start gap-4">
-                  <div className="text-5xl">{formData.icon}</div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold mb-1 text-ink">{formData.name || 'Agent Name'}</h3>
-                    <p className="text-sm text-ink-muted mb-3">
-                      {formData.description || 'Agent description'}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {formData.tags.map((tag) => (
-                        <span key={tag} className="px-2 py-1 bg-surface text-ink-subtle text-xs rounded-full">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-accent">
-                      {formData.price || '0'} ETH
-                    </div>
-                    <div className="text-xs text-ink-subtle">
-                      {pricingModels.find(m => m.id === formData.pricingModel)?.name}
-                    </div>
+            {/* Preview */}
+            <div className="card">
+              <div className="flex items-start gap-4 mb-6">
+                <span className="text-5xl">{formData.icon}</span>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-ink">{formData.name}</h3>
+                  <p className="text-ink-muted">{formData.description}</p>
+                  <div className="flex items-center gap-3 mt-2 text-sm">
+                    <span className="px-2 py-1 rounded-full bg-surface-muted text-ink-subtle">
+                      {categories.find(c => c.id === formData.category)?.name}
+                    </span>
+                    <span className="text-accent font-semibold">{formData.price} ETH / request</span>
                   </div>
                 </div>
               </div>
 
-              {/* Summary */}
-              <div className="space-y-4">
-                <div className="flex justify-between py-3 border-b border-border">
-                  <span className="text-ink-muted">Category</span>
-                  <span className="font-medium text-ink">{categories.find(c => c.id === formData.category)?.name}</span>
+              <div className="border-t border-border pt-4 space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-ink-muted">Agent Address</span>
+                  <span className="font-mono text-ink">{address?.slice(0, 10)}…{address?.slice(-6)}</span>
                 </div>
-                <div className="flex justify-between py-3 border-b border-border">
-                  <span className="text-ink-muted">Agent (wallet)</span>
-                  <span className="font-mono text-sm">{address ? `${address.slice(0, 10)}…` : 'Connect wallet'}</span>
+                <div className="flex justify-between">
+                  <span className="text-ink-muted">Execution</span>
+                  <span className="text-ink">{executionMode === 'hosted' ? 'Hosted by AgentL2' : 'Self-Hosted'}</span>
                 </div>
-                <div className="flex justify-between py-3 border-b border-border">
-                  <span className="text-ink-muted">GitHub</span>
-                  <span className="text-accent">{formData.github || 'Not provided'}</span>
-                </div>
-                <div className="flex justify-between py-3 border-b border-border">
+                {executionMode === 'hosted' && selectedTemplate && (
+                  <div className="flex justify-between">
+                    <span className="text-ink-muted">Template</span>
+                    <span className="text-ink">{selectedTemplate.name}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
                   <span className="text-ink-muted">Platform Fee</span>
                   <span className="text-ink">2.5%</span>
                 </div>
-                <div className="flex justify-between py-3">
+                <div className="flex justify-between">
                   <span className="text-ink-muted">Your Earnings</span>
-                  <span className="text-green-600 font-bold">97.5% of revenue</span>
+                  <span className="text-green-400 font-semibold">97.5%</span>
                 </div>
               </div>
             </div>
 
-            {/* Terms */}
-            <div className="card bg-accent/5 border-accent/30">
-              <div className="flex items-start gap-3">
-                <Shield className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-semibold text-accent mb-2">Submission Guidelines</h4>
-                  <ul className="text-sm text-ink-muted space-y-1">
-                    <li>• Your agent will be reviewed within 24-48 hours</li>
-                    <li>• Agents must comply with our terms of service</li>
-                    <li>• You retain full ownership of your agent and code</li>
-                    <li>• Earnings are distributed automatically via smart contract</li>
-                  </ul>
-                </div>
-              </div>
+            {/* What happens next */}
+            <div className="card bg-surface-muted">
+              <h4 className="font-semibold text-ink mb-3">What happens when you submit:</h4>
+              <ol className="space-y-2 text-sm text-ink-muted">
+                {isAgentRegistered === false && (
+                  <li className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs shrink-0 mt-0.5">1</span>
+                    <span>Your wallet is registered as an agent on AgentL2</span>
+                  </li>
+                )}
+                <li className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs shrink-0 mt-0.5">{isAgentRegistered === false ? '2' : '1'}</span>
+                  <span>Your service is listed on the marketplace</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs shrink-0 mt-0.5">{isAgentRegistered === false ? '3' : '2'}</span>
+                  <span>
+                    {executionMode === 'hosted'
+                      ? "You'll configure your hosted runtime in the dashboard"
+                      : "You'll set up the self-hosted runtime (see docs)"}
+                  </span>
+                </li>
+              </ol>
             </div>
 
             <div className="flex justify-between">
-              <button onClick={() => setStep(2)} className="btn-ghost">
-                ← Back
-              </button>
+              <button onClick={() => setStep(2)} className="btn-ghost">← Back</button>
               <button
-                onClick={() => handleSubmit()}
+                onClick={handleSubmit}
                 disabled={isSubmitting || !address}
                 className="btn-primary flex items-center gap-2 disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Submitting...</span>
+                    Registering...
                   </>
                 ) : (
                   <>
                     <Rocket className="w-5 h-5" />
-                    <span>Submit Agent</span>
+                    {isAgentRegistered === false ? 'Register Agent & Service' : 'Register Service'}
                   </>
                 )}
               </button>
@@ -693,101 +575,101 @@ export default function SubmitAgentPage() {
         {/* Step 4: Success */}
         {step === 4 && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="text-center"
+            className="max-w-lg mx-auto text-center"
           >
-            <div className="card max-w-lg mx-auto">
+            <div className="card">
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-                className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${isFirstTimeAgent ? 'bg-green-500/20' : 'bg-green-500/20'}`}
+                transition={{ delay: 0.2, type: 'spring' }}
+                className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-6"
               >
-                <CheckCircle2 className="w-10 h-10 text-green-600" />
+                <CheckCircle2 className="w-10 h-10 text-green-500" />
               </motion.div>
 
-              {isFirstTimeAgent ? (
-                <>
-                  <motion.span
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    className="inline-block px-3 py-1 bg-green-500/20 text-green-500 text-sm font-semibold rounded-full border border-green-500/30 mb-4"
-                  >
-                    Live on network
-                  </motion.span>
-                  <h2 className="text-2xl font-bold mb-3 text-ink">Your agent is live</h2>
-                  <p className="text-ink-muted mb-4">
-                    Your agent is now on the network. It can receive orders and earn. Add more services anytime from the dashboard.
-                  </p>
-                  <p className="text-ink-subtle text-sm mb-6">
-                    &quot;{formData.name}&quot; and your first service are registered on-chain.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h2 className="text-2xl font-bold mb-3 text-ink">Agent & Service Registered</h2>
-                  <p className="text-ink-muted mb-6">
-                    &quot;{formData.name}&quot; is now registered on-chain. Your service is live on the marketplace.
-                  </p>
-                </>
-              )}
+              <h2 className="text-2xl font-bold mb-2 text-ink">
+                {isFirstTimeAgent ? 'Agent Created!' : 'Service Registered!'}
+              </h2>
+              <p className="text-ink-muted mb-6">
+                {isFirstTimeAgent
+                  ? `"${formData.name}" is now live on the AgentL2 network.`
+                  : `"${formData.name}" has been added to your agent.`}
+              </p>
 
               {txHash && (
-                <div className="p-4 bg-surface-muted border border-border rounded-lg mb-4 text-left">
-                  <div className="text-sm text-ink-subtle mb-1">Transaction</div>
-                  <a href="#" className="font-mono text-accent text-sm break-all" onClick={(e) => { e.preventDefault(); navigator.clipboard.writeText(txHash); }}>
-                    {txHash.slice(0, 18)}…{txHash.slice(-8)}
-                  </a>
-                </div>
-              )}
-              {newServiceId && (
-                <div className="p-4 bg-surface-muted border border-border rounded-lg mb-6 text-left">
-                  <div className="text-sm text-ink-subtle mb-1">Service ID</div>
-                  <div className="font-mono text-accent text-sm break-all">{newServiceId}</div>
+                <div className="p-3 bg-surface-muted rounded-lg mb-6 text-left">
+                  <div className="text-xs text-ink-subtle mb-1">Transaction</div>
+                  <code className="text-sm text-accent break-all">{txHash.slice(0, 20)}…{txHash.slice(-8)}</code>
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/marketplace" className="btn-secondary flex-1 flex items-center justify-center gap-2">
-                  <span>View on Marketplace</span>
+              {/* Next Step CTA */}
+              <div className="p-4 bg-accent/10 border border-accent/30 rounded-xl mb-6 text-left">
+                <div className="flex items-start gap-3">
+                  {executionMode === 'hosted' ? (
+                    <>
+                      <Cloud className="w-6 h-6 text-accent shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-ink mb-1">Next: Deploy Your Runtime</h4>
+                        <p className="text-sm text-ink-muted">
+                          Go to Dashboard → Hosted to configure API keys and start your agent.
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Terminal className="w-6 h-6 text-accent shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-ink mb-1">Next: Set Up Runtime</h4>
+                        <p className="text-sm text-ink-muted">
+                          Go to Dashboard → Dev Runtime for setup instructions.
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <Link
+                  href={executionMode === 'hosted' ? '/dashboard?tab=hosted' : '/dashboard?tab=runtime'}
+                  className="btn-primary w-full flex items-center justify-center gap-2"
+                >
+                  {executionMode === 'hosted' ? (
+                    <>
+                      <Cloud className="w-4 h-4" />
+                      Configure Hosted Runtime
+                    </>
+                  ) : (
+                    <>
+                      <Settings className="w-4 h-4" />
+                      View Runtime Setup
+                    </>
+                  )}
                 </Link>
-                <Link href={isFirstTimeAgent ? '/dashboard?new=1' : '/dashboard'} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                  <span>Go to Dashboard</span>
+                <Link href="/dashboard" className="btn-secondary w-full">
+                  Go to Dashboard
                 </Link>
-                {isFirstTimeAgent && (
-                  <Link href="/marketplace/submit" className="btn-ghost flex-1 flex items-center justify-center gap-2">
-                    <Plus className="w-4 h-4" />
-                    <span>Add another service</span>
-                  </Link>
-                )}
               </div>
             </div>
           </motion.div>
         )}
       </div>
 
-      {/* Error toast — bottom right, minimal message */}
+      {/* Error Toast */}
       <AnimatePresence>
         {submitError && (
           <motion.div
-            initial={{ opacity: 0, x: 24, scale: 0.96 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 24, scale: 0.96 }}
-            transition={{ duration: 0.2 }}
+            initial={{ opacity: 0, x: 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 24 }}
             className="fixed bottom-4 right-4 z-50 max-w-sm flex items-start gap-3 p-3 rounded-lg bg-surface-elevated border border-red-500/40 shadow-lg"
           >
-            <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-            <p className="text-sm text-ink flex-1 min-w-0">
-              {shortErrorMessage(submitError)}
-            </p>
-            <button
-              type="button"
-              onClick={() => setSubmitError(null)}
-              className="shrink-0 p-1 rounded hover:bg-white/10 text-ink-muted hover:text-ink transition-colors"
-              aria-label="Dismiss"
-            >
+            <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+            <p className="text-sm text-ink flex-1">{shortErrorMessage(submitError)}</p>
+            <button onClick={() => setSubmitError(null)} className="p-1 hover:bg-white/10 rounded">
               <X className="w-4 h-4" />
             </button>
           </motion.div>
