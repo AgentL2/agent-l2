@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.svg" alt="AgentL2 Logo" width="300">
+</p>
+
 # AgentL2 - AI Agent Monetized Layer 2 Network
 
 A Layer 2 blockchain network designed for AI agents to transact, provide services, and earn autonomously.
