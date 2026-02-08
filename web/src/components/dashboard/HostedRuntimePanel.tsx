@@ -1,0 +1,480 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Plus, Play, Pause, Square, Zap, Activity, CheckCircle2, XCircle,
+  AlertTriangle, Clock, Settings, Terminal, Trash2, RefreshCw,
+  ChevronRight, Loader2, DollarSign, Cpu
+} from 'lucide-react';
+import {
+  getHostedAgents,
+  pauseHostedAgent,
+  resumeHostedAgent,
+  stopHostedAgent,
+  getHostedAgentLogs,
+  getTemplateById,
+  type HostedAgent,
+  type HostedAgentLog,
+  EXECUTOR_TEMPLATES,
+} from '@/lib/hosted';
+import DeployAgentModal from './DeployAgentModal';
+
+interface HostedRuntimePanelProps {
+  address: string;
+}
+
+export default function HostedRuntimePanel({ address }: HostedRuntimePanelProps) {
+  const [agents, setAgents] = useState<HostedAgent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showDeployModal, setShowDeployModal] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<HostedAgent | null>(null);
+  const [logs, setLogs] = useState<HostedAgentLog[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  const fetchAgents = useCallback(async () => {
+    try {
+      const data = await getHostedAgents(address);
+      setAgents(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch agents');
+    } finally {
+      setLoading(false);
+    }
+  }, [address]);
+
+  useEffect(() => {
+    fetchAgents();
+    const interval = setInterval(fetchAgents, 10000);
+    return () => clearInterval(interval);
+  }, [fetchAgents]);
+
+  const fetchLogs = useCallback(async (agentId: string) => {
+    setLoadingLogs(true);
+    try {
+      const data = await getHostedAgentLogs(agentId);
+      setLogs(data);
+    } catch {
+      setLogs([]);
+    } finally {
+      setLoadingLogs(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedAgent) {
+      fetchLogs(selectedAgent.id);
+      const interval = setInterval(() => fetchLogs(selectedAgent.id), 5000);
+      return () => clearInterval(interval);
+    }
+  }, [selectedAgent, fetchLogs]);
+
+  const handlePause = async (agent: HostedAgent) => {
+    try {
+      await pauseHostedAgent(agent.id);
+      fetchAgents();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to pause');
+    }
+  };
+
+  const handleResume = async (agent: HostedAgent) => {
+    try {
+      await resumeHostedAgent(agent.id);
+      fetchAgents();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to resume');
+    }
+  };
+
+  const handleStop = async (agent: HostedAgent) => {
+    if (!confirm(`Stop agent "${agent.name}"? This will stop processing orders.`)) return;
+    try {
+      await stopHostedAgent(agent.id);
+      fetchAgents();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to stop');
+    }
+  };
+
+  const handleDeployed = () => {
+    setShowDeployModal(false);
+    fetchAgents();
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 text-accent animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-ink">Hosted Agents</h2>
+          <p className="text-ink-muted">Deploy and manage agents on AgentL2 infrastructure</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={fetchAgents} className="btn-ghost p-2" title="Refresh">
+            <RefreshCw className="w-5 h-5" />
+          </button>
+          <button onClick={() => setShowDeployModal(true)} className="btn-primary">
+            <Plus className="w-4 h-4" />
+            Deploy Agent
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="card bg-red-500/10 border-red-500/30 text-red-400">
+          {error}
+        </div>
+      )}
+
+      {/* Agents List */}
+      {agents.length === 0 ? (
+        <EmptyState onDeploy={() => setShowDeployModal(true)} />
+      ) : (
+        <div className="grid gap-4">
+          {agents.map((agent) => (
+            <AgentCard
+              key={agent.id}
+              agent={agent}
+              isSelected={selectedAgent?.id === agent.id}
+              onSelect={() => setSelectedAgent(selectedAgent?.id === agent.id ? null : agent)}
+              onPause={() => handlePause(agent)}
+              onResume={() => handleResume(agent)}
+              onStop={() => handleStop(agent)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Selected Agent Details */}
+      <AnimatePresence>
+        {selectedAgent && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="space-y-4"
+          >
+            <AgentDetails agent={selectedAgent} logs={logs} loadingLogs={loadingLogs} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Deploy Modal */}
+      <DeployAgentModal
+        isOpen={showDeployModal}
+        onClose={() => setShowDeployModal(false)}
+        onDeployed={handleDeployed}
+        address={address}
+      />
+    </div>
+  );
+}
+
+// ============================================================================
+// Sub-Components
+// ============================================================================
+
+function EmptyState({ onDeploy }: { onDeploy: () => void }) {
+  return (
+    <div className="card text-center py-16">
+      <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-surface-elevated border border-border flex items-center justify-center">
+        <Cpu className="w-10 h-10 text-accent opacity-50" />
+      </div>
+      <h3 className="text-2xl font-bold mb-2 text-ink">No Hosted Agents Yet</h3>
+      <p className="text-ink-muted max-w-md mx-auto mb-6">
+        Deploy your first agent to start earning. Choose from templates or connect your own webhook.
+      </p>
+      <button onClick={onDeploy} className="btn-primary">
+        <Plus className="w-4 h-4" />
+        Deploy Your First Agent
+      </button>
+
+      {/* Template Preview */}
+      <div className="mt-12 pt-8 border-t border-border">
+        <h4 className="text-lg font-semibold mb-4 text-ink">Popular Templates</h4>
+        <div className="grid md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+          {EXECUTOR_TEMPLATES.filter(t => t.popular).map((template) => (
+            <button
+              key={template.id}
+              onClick={onDeploy}
+              className="card text-left hover:border-accent/50 transition-colors"
+            >
+              <div className="text-3xl mb-2">{template.icon}</div>
+              <h5 className="font-semibold text-ink">{template.name}</h5>
+              <p className="text-xs text-ink-muted line-clamp-2">{template.description}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentCard({
+  agent,
+  isSelected,
+  onSelect,
+  onPause,
+  onResume,
+  onStop,
+}: {
+  agent: HostedAgent;
+  isSelected: boolean;
+  onSelect: () => void;
+  onPause: () => void;
+  onResume: () => void;
+  onStop: () => void;
+}) {
+  const template = getTemplateById(agent.template.id) || agent.template;
+  const statusConfig = getStatusConfig(agent.status);
+
+  return (
+    <motion.div
+      layout
+      className={`card cursor-pointer transition-all ${
+        isSelected ? 'border-accent/50 bg-accent/5' : 'hover:border-border-light'
+      }`}
+      onClick={onSelect}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="text-4xl">{template.icon}</div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-ink">{agent.name}</h3>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.classes}`}>
+                {statusConfig.icon}
+                {statusConfig.label}
+              </span>
+            </div>
+            <p className="text-sm text-ink-muted">{template.name}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-6">
+          {/* Stats */}
+          <div className="hidden md:flex items-center gap-6 text-sm">
+            <div className="text-center">
+              <p className="text-ink-muted">Orders</p>
+              <p className="font-semibold text-ink">{agent.stats.completedOrders}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-ink-muted">Earned</p>
+              <p className="font-semibold text-green-400">
+                {formatEarnings(agent.stats.totalEarnings)}
+              </p>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            {agent.status === 'running' && (
+              <button onClick={onPause} className="btn-ghost p-2" title="Pause">
+                <Pause className="w-4 h-4" />
+              </button>
+            )}
+            {agent.status === 'paused' && (
+              <button onClick={onResume} className="btn-ghost p-2 text-green-400" title="Resume">
+                <Play className="w-4 h-4" />
+              </button>
+            )}
+            {(agent.status === 'running' || agent.status === 'paused') && (
+              <button onClick={onStop} className="btn-ghost p-2 text-red-400" title="Stop">
+                <Square className="w-4 h-4" />
+              </button>
+            )}
+            <ChevronRight className={`w-5 h-5 text-ink-muted transition-transform ${isSelected ? 'rotate-90' : ''}`} />
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function AgentDetails({
+  agent,
+  logs,
+  loadingLogs,
+}: {
+  agent: HostedAgent;
+  logs: HostedAgentLog[];
+  loadingLogs: boolean;
+}) {
+  const template = getTemplateById(agent.template.id) || agent.template;
+
+  return (
+    <div className="grid lg:grid-cols-2 gap-6">
+      {/* Stats */}
+      <div className="card">
+        <h4 className="text-lg font-semibold mb-4 text-ink flex items-center gap-2">
+          <Activity className="w-5 h-5 text-accent" />
+          Statistics
+        </h4>
+        <div className="grid grid-cols-2 gap-4">
+          <StatItem label="Total Orders" value={agent.stats.totalOrders} />
+          <StatItem label="Completed" value={agent.stats.completedOrders} color="green" />
+          <StatItem label="Failed" value={agent.stats.failedOrders} color="red" />
+          <StatItem 
+            label="Total Earned" 
+            value={formatEarnings(agent.stats.totalEarnings)} 
+            color="green" 
+          />
+        </div>
+      </div>
+
+      {/* Config */}
+      <div className="card">
+        <h4 className="text-lg font-semibold mb-4 text-ink flex items-center gap-2">
+          <Settings className="w-5 h-5 text-accent" />
+          Configuration
+        </h4>
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between">
+            <span className="text-ink-muted">Template</span>
+            <span className="text-ink">{template.name}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-ink-muted">Poll Interval</span>
+            <span className="text-ink">{agent.config.pollInterval}ms</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-ink-muted">Max Concurrent</span>
+            <span className="text-ink">{agent.config.maxConcurrent}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-ink-muted">Auto Complete</span>
+            <span className="text-ink">{agent.config.autoComplete ? 'Yes' : 'No'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-ink-muted">Secrets Configured</span>
+            <span className="text-ink">{agent.config.secretsConfigured.length} keys</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Logs */}
+      <div className="card lg:col-span-2">
+        <h4 className="text-lg font-semibold mb-4 text-ink flex items-center gap-2">
+          <Terminal className="w-5 h-5 text-accent" />
+          Recent Logs
+        </h4>
+        {loadingLogs ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 text-accent animate-spin" />
+          </div>
+        ) : logs.length === 0 ? (
+          <div className="text-center py-8 text-ink-muted">
+            No logs yet
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {logs.map((log) => (
+              <LogEntry key={log.id} log={log} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatItem({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string | number;
+  color?: 'green' | 'red';
+}) {
+  const colorClass = color === 'green' ? 'text-green-400' : color === 'red' ? 'text-red-400' : 'text-ink';
+  return (
+    <div className="p-3 rounded-lg bg-surface-muted">
+      <p className="text-xs text-ink-muted mb-1">{label}</p>
+      <p className={`text-xl font-semibold ${colorClass}`}>{value}</p>
+    </div>
+  );
+}
+
+function LogEntry({ log }: { log: HostedAgentLog }) {
+  const levelConfig = {
+    info: { icon: <Activity className="w-3 h-3" />, class: 'text-blue-400' },
+    warn: { icon: <AlertTriangle className="w-3 h-3" />, class: 'text-yellow-400' },
+    error: { icon: <XCircle className="w-3 h-3" />, class: 'text-red-400' },
+  };
+  const config = levelConfig[log.level];
+
+  return (
+    <div className="flex items-start gap-2 text-sm">
+      <span className={config.class}>{config.icon}</span>
+      <span className="text-ink-muted shrink-0">
+        {new Date(log.timestamp).toLocaleTimeString()}
+      </span>
+      <span className="text-ink">{log.message}</span>
+      {log.orderId && (
+        <span className="text-ink-subtle font-mono text-xs">
+          [{log.orderId.slice(0, 8)}...]
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function getStatusConfig(status: HostedAgent['status']) {
+  const configs = {
+    pending: { 
+      label: 'Pending', 
+      classes: 'bg-gray-500/20 text-gray-400',
+      icon: <Clock className="w-3 h-3 mr-1" />,
+    },
+    starting: { 
+      label: 'Starting', 
+      classes: 'bg-yellow-500/20 text-yellow-400',
+      icon: <Loader2 className="w-3 h-3 mr-1 animate-spin" />,
+    },
+    running: { 
+      label: 'Running', 
+      classes: 'bg-green-500/20 text-green-400',
+      icon: <span className="w-2 h-2 mr-1 rounded-full bg-green-400 animate-pulse" />,
+    },
+    paused: { 
+      label: 'Paused', 
+      classes: 'bg-yellow-500/20 text-yellow-400',
+      icon: <Pause className="w-3 h-3 mr-1" />,
+    },
+    error: { 
+      label: 'Error', 
+      classes: 'bg-red-500/20 text-red-400',
+      icon: <XCircle className="w-3 h-3 mr-1" />,
+    },
+    stopped: { 
+      label: 'Stopped', 
+      classes: 'bg-gray-500/20 text-gray-400',
+      icon: <Square className="w-3 h-3 mr-1" />,
+    },
+  };
+  return configs[status];
+}
+
+function formatEarnings(wei: string): string {
+  const value = BigInt(wei || '0');
+  const eth = Number(value) / 1e18;
+  if (eth === 0) return '0 ETH';
+  if (eth < 0.001) return '<0.001 ETH';
+  return `${eth.toFixed(3)} ETH`;
+}

@@ -20,12 +20,13 @@ import OrdersTable from '@/components/dashboard/OrdersTable';
 import EarningsChart from '@/components/dashboard/EarningsChart';
 import ProofOfWorkPanel from '@/components/dashboard/ProofOfWorkPanel';
 import RuntimePanel from '@/components/dashboard/RuntimePanel';
+import HostedRuntimePanel from '@/components/dashboard/HostedRuntimePanel';
 
 const NEW_AGENT_BANNER_KEY = 'agentL2_newAgentBannerDismissed';
 
 export default function DashboardClient() {
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'orders' | 'analytics' | 'proofofwork' | 'runtime' | 'settings' | 'bridge'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'orders' | 'analytics' | 'proofofwork' | 'runtime' | 'hosted' | 'settings' | 'bridge'>('overview');
   const { address, isConnecting, error, connect } = useWallet();
   const [agentData, setAgentData] = useState<AgentDetailResponse | null>(null);
   const [orders, setOrders] = useState<OrderSummary[]>([]);
@@ -275,6 +276,12 @@ export default function DashboardClient() {
                 ) : (
                   <OrdersTable orders={orders} />
                 )}
+              </motion.div>
+            )}
+
+            {activeTab === 'hosted' && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <HostedRuntimePanel address={address!} />
               </motion.div>
             )}
 
