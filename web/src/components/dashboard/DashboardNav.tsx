@@ -5,9 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import {
   LayoutDashboard, Bot, ShoppingBag, BarChart3, Settings,
-  Cpu, Menu, X, Store, ArrowLeftRight, ShieldCheck, Zap, Cloud,
+  Menu, X, Store, ArrowLeftRight, ShieldCheck, Zap, Cloud,
   ChevronDown, Code, BookOpen, Github
 } from 'lucide-react';
+import Logo from '@/components/Logo';
 import { useWallet } from '@/contexts/WalletContext';
 import NavDropdown from '@/components/navigation/NavDropdown';
 import WalletDropdown from '@/components/navigation/WalletDropdown';
@@ -98,9 +99,7 @@ export default function DashboardNav({ activeTab, setActiveTab, isConnected, add
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-surface-elevated border border-border flex items-center justify-center">
-              <Cpu className="w-5 h-5 text-accent" />
-            </div>
+            <Logo size={40} />
             <div className="hidden sm:block">
               <div className="text-lg font-bold text-ink">AgentL2</div>
               <div className="text-xs text-ink-subtle">Dashboard</div>

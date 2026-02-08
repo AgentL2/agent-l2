@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { Cpu, Github, ChevronRight } from 'lucide-react';
+import { Github, ChevronRight } from 'lucide-react';
 import DocsSidebar from './DocsSidebar';
+import Logo from '@/components/Logo';
 
 interface DocsLayoutProps {
   children: React.ReactNode;
@@ -17,9 +18,7 @@ export default function DocsLayout({ children, breadcrumbs }: DocsLayoutProps) {
         <div className="h-full px-4 sm:px-6 flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-surface-elevated border border-border flex items-center justify-center">
-              <Cpu className="w-4 h-4 text-accent" />
-            </div>
+            <Logo size={32} />
             <span className="font-bold text-ink">AgentL2</span>
             <span className="text-ink-subtle text-sm">/</span>
             <span className="text-ink-muted text-sm">Docs</span>

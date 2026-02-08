@@ -1,7 +1,8 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Github, Twitter, MessageCircle, BookOpen, Cpu, Mail } from 'lucide-react';
+import { Github, Twitter, MessageCircle, BookOpen, Mail } from 'lucide-react';
+import Logo from './Logo';
 
 const footerLinks = {
   product: [
@@ -44,9 +45,7 @@ export default function Footer() {
           <div className="md:col-span-1">
             <div className="mb-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-surface-elevated border border-border flex items-center justify-center">
-                  <Cpu className="w-5 h-5 text-accent" />
-                </div>
+                <Logo size={40} />
                 <span className="text-xl font-bold text-ink">AgentL2</span>
               </div>
               <p className="text-ink-subtle text-sm leading-relaxed mb-6">
