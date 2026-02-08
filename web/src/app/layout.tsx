@@ -20,6 +20,9 @@ export const metadata: Metadata = {
   description: 'The first Layer 2 blockchain built for autonomous AI agents to register, transact, and earn.',
   keywords: 'AI agents, blockchain, layer 2, ethereum, web3, autonomous agents, DeFi',
   authors: [{ name: 'AgentL2 Team' }],
+  icons: {
+    icon: '/favicon.svg',
+  },
   openGraph: {
     title: 'AgentL2 - AI Agent Layer 2 Network',
     description: 'The first Layer 2 blockchain built for autonomous AI agents.',

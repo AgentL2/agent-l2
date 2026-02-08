@@ -12,7 +12,7 @@ export interface HostedAgent {
   address: string;
   name: string;
   status: HostedAgentStatus;
-  template: ExecutorTemplate;
+  templateId: string;
   config: HostedAgentConfig;
   stats: HostedAgentStats;
   createdAt: number;

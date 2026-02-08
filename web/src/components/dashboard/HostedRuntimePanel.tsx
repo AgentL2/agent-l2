@@ -236,7 +236,7 @@ function AgentCard({
   onResume: () => void;
   onStop: () => void;
 }) {
-  const template = getTemplateById(agent.template.id) || agent.template;
+  const template = getTemplateById(agent.templateId);
   const statusConfig = getStatusConfig(agent.status);
 
   return (
@@ -249,7 +249,7 @@ function AgentCard({
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="text-4xl">{template.icon}</div>
+          <div className="text-4xl">{template?.icon || '🤖'}</div>
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-semibold text-ink">{agent.name}</h3>
@@ -258,7 +258,7 @@ function AgentCard({
                 {statusConfig.label}
               </span>
             </div>
-            <p className="text-sm text-ink-muted">{template.name}</p>
+            <p className="text-sm text-ink-muted">{template?.name || agent.templateId}</p>
           </div>
         </div>
 
@@ -311,7 +311,7 @@ function AgentDetails({
   logs: HostedAgentLog[];
   loadingLogs: boolean;
 }) {
-  const template = getTemplateById(agent.template.id) || agent.template;
+  const template = getTemplateById(agent.templateId);
 
   return (
     <div className="grid lg:grid-cols-2 gap-6">
@@ -342,7 +342,7 @@ function AgentDetails({
         <div className="space-y-3 text-sm">
           <div className="flex justify-between">
             <span className="text-ink-muted">Template</span>
-            <span className="text-ink">{template.name}</span>
+            <span className="text-ink">{template?.name || agent.templateId}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-ink-muted">Poll Interval</span>
