@@ -2,19 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ClawHub-inspired: modern, rustic, network-like */
+/* AgentL2: Premium dark theme with amber accents */
 
 @layer base {
   * {
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-surface text-ink font-sans antialiased;
     background-image:
-      linear-gradient(to right, rgba(120, 113, 108, 0.05) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(120, 113, 108, 0.05) 1px, transparent 1px);
-    background-size: 24px 24px;
+      radial-gradient(circle at 50% 0%, rgba(217, 119, 6, 0.08) 0%, transparent 50%),
+      linear-gradient(to right, rgba(120, 113, 108, 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(120, 113, 108, 0.03) 1px, transparent 1px);
+    background-size: 100% 100%, 32px 32px, 32px 32px;
+    background-attachment: fixed;
   }
 }
 
@@ -91,8 +97,19 @@
 }
 
 ::selection {
-  background-color: rgba(217, 119, 6, 0.25);
+  background-color: rgba(217, 119, 6, 0.35);
   color: #fafaf9;
+}
+
+/* Smooth focus states */
+*:focus-visible {
+  @apply outline-none ring-2 ring-amber-500/50 ring-offset-2 ring-offset-surface;
+}
+
+/* Premium text rendering */
+h1, h2, h3, h4, h5, h6 {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Scrollbar — warm, minimal */
