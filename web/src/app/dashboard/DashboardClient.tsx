@@ -11,7 +11,6 @@ import { useSearchParams } from 'next/navigation';
 import { useWallet } from '@/contexts/WalletContext';
 import { getAgent, getAgentOrders, ApiError, type AgentDetailResponse, type OrderSummary } from '@/lib/api';
 import DashboardNav from '@/components/dashboard/DashboardNav';
-import BridgePanel from '@/components/dashboard/BridgePanel';
 import AgentCard from '@/components/dashboard/AgentCard';
 import StatsOverview from '@/components/dashboard/StatsOverview';
 import RecentActivity from '@/components/dashboard/RecentActivity';
@@ -332,7 +331,13 @@ export default function DashboardClient() {
 
             {activeTab === 'bridge' && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <BridgePanel />
+                <div className="card text-center py-12">
+                  <h2 className="text-2xl font-bold mb-4 text-ink">Bridge to AgentL2</h2>
+                  <p className="text-ink-muted mb-6">Transfer assets from any chain instantly.</p>
+                  <Link href="/bridge" className="btn-primary inline-flex items-center gap-2">
+                    <Zap className="w-4 h-4" /> Open Bridge
+                  </Link>
+                </div>
               </motion.div>
             )}
 
