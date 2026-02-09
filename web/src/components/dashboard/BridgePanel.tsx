@@ -148,13 +148,13 @@ export default function BridgePanel({ address }: BridgePanelProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
+      <div className="text-center">
         <h2 className="text-2xl font-bold text-ink">Bridge</h2>
         <p className="text-ink-muted">Transfer assets to AgentL2 instantly</p>
       </div>
 
       {/* Bridge Card */}
-      <div className="max-w-lg">
+      <div className="max-w-lg mx-auto">
         <div className="card">
           {/* From Section */}
           <div className="mb-4">
