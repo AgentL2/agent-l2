@@ -7,6 +7,7 @@ import {
   AlertTriangle, Clock, Settings, Terminal, Trash2, RefreshCw,
   ChevronRight, Loader2, DollarSign, Cpu
 } from 'lucide-react';
+import Link from 'next/link';
 import {
   getHostedAgents,
   pauseHostedAgent,
@@ -18,7 +19,6 @@ import {
   type HostedAgentLog,
   EXECUTOR_TEMPLATES,
 } from '@/lib/hosted';
-import DeployAgentModal from './DeployAgentModal';
 
 interface HostedRuntimePanelProps {
   address: string;
@@ -55,7 +55,6 @@ export default function HostedRuntimePanel({ address }: HostedRuntimePanelProps)
   const [agents, setAgents] = useState<HostedAgent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showDeployModal, setShowDeployModal] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<HostedAgent | null>(null);
   const [logs, setLogs] = useState<HostedAgentLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
@@ -139,11 +138,6 @@ export default function HostedRuntimePanel({ address }: HostedRuntimePanelProps)
     }
   };
 
-  const handleDeployed = () => {
-    setShowDeployModal(false);
-    fetchAgents();
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -164,10 +158,10 @@ export default function HostedRuntimePanel({ address }: HostedRuntimePanelProps)
           <button onClick={fetchAgents} className="btn-ghost p-2" title="Refresh">
             <RefreshCw className="w-5 h-5" />
           </button>
-          <button onClick={() => setShowDeployModal(true)} className="btn-primary">
+          <Link href="/dashboard/deploy" className="btn-primary">
             <Plus className="w-4 h-4" />
             Deploy Agent
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -179,7 +173,7 @@ export default function HostedRuntimePanel({ address }: HostedRuntimePanelProps)
 
       {/* Agents List */}
       {agents.length === 0 ? (
-        <EmptyState onDeploy={() => setShowDeployModal(true)} />
+        <EmptyState />
       ) : (
         <div className="grid gap-4">
           {agents.map((agent) => (
@@ -209,14 +203,6 @@ export default function HostedRuntimePanel({ address }: HostedRuntimePanelProps)
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Deploy Modal */}
-      <DeployAgentModal
-        isOpen={showDeployModal}
-        onClose={() => setShowDeployModal(false)}
-        onDeployed={handleDeployed}
-        address={address}
-      />
     </div>
   );
 }
@@ -225,7 +211,7 @@ export default function HostedRuntimePanel({ address }: HostedRuntimePanelProps)
 // Sub-Components
 // ============================================================================
 
-function EmptyState({ onDeploy }: { onDeploy: () => void }) {
+function EmptyState() {
   return (
     <div className="card text-center py-16">
       <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-surface-elevated border border-border flex items-center justify-center">
@@ -235,10 +221,10 @@ function EmptyState({ onDeploy }: { onDeploy: () => void }) {
       <p className="text-ink-muted max-w-md mx-auto mb-6">
         Deploy an agent to start earning. Your agent data is saved in your browser.
       </p>
-      <button onClick={onDeploy} className="btn-primary mb-4">
+      <Link href="/dashboard/deploy" className="btn-primary inline-flex items-center gap-2 mb-4">
         <Plus className="w-4 h-4" />
         Deploy Agent
-      </button>
+      </Link>
       <p className="text-xs text-ink-subtle max-w-sm mx-auto">
         Note: In this MVP, hosted agent data is stored locally in your browser. 
         Production will use persistent database storage.
@@ -249,15 +235,15 @@ function EmptyState({ onDeploy }: { onDeploy: () => void }) {
         <h4 className="text-lg font-semibold mb-4 text-ink">Popular Templates</h4>
         <div className="grid md:grid-cols-3 gap-4 max-w-3xl mx-auto">
           {EXECUTOR_TEMPLATES.filter(t => t.popular).map((template) => (
-            <button
+            <Link
               key={template.id}
-              onClick={onDeploy}
+              href="/dashboard/deploy"
               className="card text-left hover:border-accent/50 transition-colors"
             >
               <div className="text-3xl mb-2">{template.icon}</div>
               <h5 className="font-semibold text-ink">{template.name}</h5>
               <p className="text-xs text-ink-muted line-clamp-2">{template.description}</p>
-            </button>
+            </Link>
           ))}
         </div>
       </div>
