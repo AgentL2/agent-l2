@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ethers } from 'ethers';
 import { useWallet } from '@/contexts/WalletContext';
+import DashboardNav from '@/components/dashboard/DashboardNav';
 import { getAgent, formatEth, type AgentDetailResponse } from '@/lib/api';
 import { createOrder as doCreateOrder, isWritesConfigured } from '@/lib/writes';
 import { fetchAgentMetadata, getAgentDisplayName, type AgentMetadata } from '@/lib/agentMetadata';
@@ -102,7 +103,13 @@ export default function AgentDetailPage() {
   if (!agentId || loading) {
     return (
       <div className="min-h-screen bg-surface text-ink">
-        <div className="max-w-7xl mx-auto px-6 py-12 text-center text-ink-muted">Loading agent…</div>
+        <DashboardNav
+          activeTab="overview"
+          setActiveTab={() => {}}
+          isConnected={!!address}
+          address={address}
+        />
+        <div className="max-w-[1800px] mx-auto px-6 py-12 text-center text-ink-muted">Loading agent…</div>
       </div>
     );
   }
@@ -110,17 +117,21 @@ export default function AgentDetailPage() {
   if (error || !data) {
     return (
       <div className="min-h-screen bg-surface text-ink">
-        <nav className="sticky top-0 z-50 nav-bar">
-          <div className="max-w-7xl mx-auto px-6 py-4">
-            <Link href="/marketplace" className="text-ink-muted hover:text-accent flex items-center gap-2">
-              <ArrowLeft className="w-5 h-5" />
-              <span>Back to Marketplace</span>
-            </Link>
+        <DashboardNav
+          activeTab="overview"
+          setActiveTab={() => {}}
+          isConnected={!!address}
+          address={address}
+        />
+        <div className="max-w-[1800px] mx-auto px-6 py-8">
+          <Link href="/marketplace" className="text-ink-muted hover:text-accent flex items-center gap-2 mb-8">
+            <ArrowLeft className="w-5 h-5" />
+            <span>Back to Marketplace</span>
+          </Link>
+          <div className="text-center py-12">
+            <p className="text-red-400 mb-4">{error ?? 'Agent not found'}</p>
+            <Link href="/marketplace" className="btn-primary">Back to Marketplace</Link>
           </div>
-        </nav>
-        <div className="max-w-7xl mx-auto px-6 py-20 text-center">
-          <p className="text-red-400 mb-4">{error ?? 'Agent not found'}</p>
-          <Link href="/marketplace" className="btn-primary">Back to Marketplace</Link>
         </div>
       </div>
     );
@@ -149,19 +160,18 @@ export default function AgentDetailPage() {
 
   return (
     <div className="min-h-screen bg-surface text-ink">
-      <nav className="sticky top-0 z-50 nav-bar">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/marketplace" className="text-ink-muted hover:text-accent flex items-center gap-2">
-              <ArrowLeft className="w-5 h-5" />
-              <span>Back to Marketplace</span>
-            </Link>
-            <Link href="/dashboard" className="btn-primary">Dashboard</Link>
-          </div>
-        </div>
-      </nav>
+      <DashboardNav
+        activeTab="overview"
+        setActiveTab={() => {}}
+        isConnected={!!address}
+        address={address}
+      />
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-[1800px] mx-auto px-6 py-8">
+        <Link href="/marketplace" className="text-ink-muted hover:text-accent flex items-center gap-2 mb-6">
+          <ArrowLeft className="w-5 h-5" />
+          <span>Back to Marketplace</span>
+        </Link>
         {/* Hero — ClawHub-style: avatar, name, category, live badge, tagline, meta */}
         <div className="mb-10">
           <div className="flex flex-col sm:flex-row sm:items-start gap-6">

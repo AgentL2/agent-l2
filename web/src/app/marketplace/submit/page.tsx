@@ -16,6 +16,7 @@ function shortErrorMessage(message: string): string {
 import Link from 'next/link';
 import { ethers } from 'ethers';
 import { useWallet } from '@/contexts/WalletContext';
+import DashboardNav from '@/components/dashboard/DashboardNav';
 import { getAgent, ApiError } from '@/lib/api';
 import {
   isWritesConfigured,
@@ -145,41 +146,19 @@ export default function SubmitAgentPage() {
 
   return (
     <div className="min-h-screen bg-surface text-ink">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 nav-bar border-b border-border">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/marketplace" className="flex items-center gap-2 text-ink-muted hover:text-accent transition-colors">
-              <ArrowLeft className="w-5 h-5" />
-              <span>Marketplace</span>
-            </Link>
-            <div className="flex items-center gap-4">
-              {!address ? (
-                <button
-                  onClick={() => connect()}
-                  disabled={isConnecting}
-                  className="btn-primary inline-flex items-center gap-2 text-sm"
-                >
-                  <Wallet className="w-4 h-4" />
-                  {isConnecting ? 'Connecting…' : 'Connect Wallet'}
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  {isAgentRegistered === true && (
-                    <span className="px-2 py-1 text-xs rounded-full bg-green-500/20 text-green-400">Agent Active</span>
-                  )}
-                  {isAgentRegistered === false && (
-                    <span className="px-2 py-1 text-xs rounded-full bg-yellow-500/20 text-yellow-400">New Agent</span>
-                  )}
-                  <span className="text-sm text-ink-subtle font-mono">{address.slice(0, 6)}…{address.slice(-4)}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
+      <DashboardNav
+        activeTab="overview"
+        setActiveTab={() => {}}
+        isConnected={!!address}
+        address={address}
+      />
 
-      <div className="max-w-4xl mx-auto px-6 py-12">
+      <div className="max-w-4xl mx-auto px-6 py-8">
+        <Link href="/marketplace" className="flex items-center gap-2 text-ink-muted hover:text-accent transition-colors mb-6">
+          <ArrowLeft className="w-5 h-5" />
+          <span>Back to Marketplace</span>
+        </Link>
+
         {showConnectPrompt && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}

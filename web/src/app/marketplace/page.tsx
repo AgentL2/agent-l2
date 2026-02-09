@@ -5,12 +5,14 @@ import {
   Search, Bot, Sparkles, Grid, List, Zap, CheckCircle2, Star,
 } from 'lucide-react';
 import Link from 'next/link';
-import AppNav from '@/components/AppNav';
+import DashboardNav from '@/components/dashboard/DashboardNav';
 import EmptyState from '@/components/EmptyState';
 import MarketplaceAgentCard from '@/components/marketplace/MarketplaceAgentCard';
+import { useWallet } from '@/contexts/WalletContext';
 import { getAgents, getServices, getStats, formatEth, type AgentSummary, type ServiceSummary } from '@/lib/api';
 
 export default function MarketplacePage() {
+  const { address } = useWallet();
   const [agents, setAgents] = useState<AgentSummary[]>([]);
   const [services, setServices] = useState<ServiceSummary[]>([]);
   const [stats, setStats] = useState<{ agentCount: number; totalVolumeWei?: string } | null>(null);
@@ -34,7 +36,6 @@ export default function MarketplacePage() {
     return () => { cancelled = true; };
   }, []);
 
-  const agentByAddress = Object.fromEntries(agents.map(a => [a.address.toLowerCase(), a]));
   const servicesByAgent = services.reduce<Record<string, ServiceSummary[]>>((acc, s) => {
     const key = s.agent.toLowerCase();
     if (!acc[key]) acc[key] = [];
@@ -53,19 +54,26 @@ export default function MarketplacePage() {
 
   return (
     <div className="min-h-screen bg-surface text-ink">
-      <AppNav variant="app" subtitle="Marketplace" />
+      <DashboardNav
+        activeTab="overview"
+        setActiveTab={() => {}}
+        isConnected={!!address}
+        address={address}
+      />
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border bg-surface-elevated mb-6">
-            <Sparkles className="w-4 h-4 text-accent" />
-            <span className="text-sm font-medium text-accent">
-              {loading ? '…' : `${stats?.agentCount ?? 0} Agents · ${services.length} Services`}
-            </span>
+      <div className="max-w-[1800px] mx-auto px-6 py-8">
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold text-ink">Marketplace</h1>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-surface-elevated">
+              <Sparkles className="w-3 h-3 text-accent" />
+              <span className="text-xs font-medium text-accent">
+                {loading ? '…' : `${stats?.agentCount ?? 0} Agents · ${services.length} Services`}
+              </span>
+            </div>
           </div>
-          <h1 className="text-5xl md:text-6xl font-bold mb-4 text-ink">Agent Marketplace</h1>
-          <p className="text-lg text-ink-muted max-w-2xl mx-auto">
-            Discover agents and services on AgentL2. Browse without connecting; connect your wallet to submit an agent or purchase a service.
+          <p className="text-ink-muted">
+            Discover agents and services on AgentL2
           </p>
         </div>
 
