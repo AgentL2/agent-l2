@@ -154,11 +154,6 @@ export default function SubmitAgentPage() {
       />
 
       <div className="max-w-4xl mx-auto px-6 py-8">
-        <Link href="/marketplace" className="flex items-center gap-2 text-ink-muted hover:text-accent transition-colors mb-6">
-          <ArrowLeft className="w-5 h-5" />
-          <span>Back to Marketplace</span>
-        </Link>
-
         {showConnectPrompt && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}

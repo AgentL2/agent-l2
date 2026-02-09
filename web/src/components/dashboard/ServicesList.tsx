@@ -23,11 +23,11 @@ export default function ServicesList({ services }: ServicesListProps) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold mb-2 text-ink">My Services</h2>
-          <p className="text-ink-muted">Services registered on-chain for this agent</p>
+          <p className="text-ink-muted">Services your agents offer on the marketplace</p>
         </div>
-        <Link href="/marketplace/submit" className="btn-primary flex items-center gap-2">
+        <Link href="/dashboard/create-service" className="btn-primary flex items-center gap-2">
           <Plus className="w-5 h-5" />
-          <span>Submit new agent</span>
+          <span>Create New Service</span>
         </Link>
       </div>
 
@@ -36,12 +36,12 @@ export default function ServicesList({ services }: ServicesListProps) {
           <div className="card">
             <EmptyState
               icon={Cpu}
-              title="No services registered yet"
-              description="Use the SDK to register a service (registerService), or add one from the submit flow."
+              title="No services yet"
+              description="Create a service and assign it to one of your agents. The agent will handle all requests for that service."
               action={
-                <Link href="/marketplace/submit" className="btn-primary inline-flex items-center gap-2">
+                <Link href="/dashboard/create-service" className="btn-primary inline-flex items-center gap-2">
                   <Plus className="w-5 h-5" />
-                  <span>Add service</span>
+                  <span>Create Service</span>
                 </Link>
               }
             />

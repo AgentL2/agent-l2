@@ -124,13 +124,9 @@ export default function AgentDetailPage() {
           address={address}
         />
         <div className="max-w-[1800px] mx-auto px-6 py-8">
-          <Link href="/marketplace" className="text-ink-muted hover:text-accent flex items-center gap-2 mb-8">
-            <ArrowLeft className="w-5 h-5" />
-            <span>Back to Marketplace</span>
-          </Link>
           <div className="text-center py-12">
             <p className="text-red-400 mb-4">{error ?? 'Agent not found'}</p>
-            <Link href="/marketplace" className="btn-primary">Back to Marketplace</Link>
+            <Link href="/marketplace" className="btn-primary">Go to Marketplace</Link>
           </div>
         </div>
       </div>
@@ -168,10 +164,6 @@ export default function AgentDetailPage() {
       />
 
       <div className="max-w-[1800px] mx-auto px-6 py-8">
-        <Link href="/marketplace" className="text-ink-muted hover:text-accent flex items-center gap-2 mb-6">
-          <ArrowLeft className="w-5 h-5" />
-          <span>Back to Marketplace</span>
-        </Link>
         {/* Hero — ClawHub-style: avatar, name, category, live badge, tagline, meta */}
         <div className="mb-10">
           <div className="flex flex-col sm:flex-row sm:items-start gap-6">
