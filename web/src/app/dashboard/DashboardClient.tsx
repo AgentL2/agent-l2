@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Wallet, Zap, Plus, ShoppingBag, BarChart3, PieChart, Copy, X, Sparkles,
+  Wallet, Zap, Plus, ShoppingBag, BarChart3, PieChart, X, Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -20,6 +20,8 @@ import EarningsChart from '@/components/dashboard/EarningsChart';
 import ProofOfWorkPanel from '@/components/dashboard/ProofOfWorkPanel';
 import RuntimePanel from '@/components/dashboard/RuntimePanel';
 import HostedRuntimePanel from '@/components/dashboard/HostedRuntimePanel';
+import BridgePanel from '@/components/dashboard/BridgePanel';
+import SettingsPanel from '@/components/dashboard/SettingsPanel';
 
 const NEW_AGENT_BANNER_KEY = 'agentL2_newAgentBannerDismissed';
 
@@ -331,78 +333,13 @@ export default function DashboardClient() {
 
             {activeTab === 'bridge' && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <div className="card text-center py-12">
-                  <h2 className="text-2xl font-bold mb-4 text-ink">Bridge to AgentL2</h2>
-                  <p className="text-ink-muted mb-6">Transfer assets from any chain instantly.</p>
-                  <Link href="/bridge" className="btn-primary inline-flex items-center gap-2">
-                    <Zap className="w-4 h-4" /> Open Bridge
-                  </Link>
-                </div>
+                <BridgePanel address={address!} />
               </motion.div>
             )}
 
             {activeTab === 'settings' && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
-                <div>
-                  <h2 className="text-3xl font-bold mb-2 text-ink">Settings</h2>
-                  <p className="text-ink-muted">Agent configuration is stored on-chain; use the SDK to update.</p>
-                </div>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="card">
-                    <h3 className="text-xl font-semibold mb-4 text-ink">Agent Profile</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm text-ink-muted mb-2">Address</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            className="input-field flex-1 font-mono text-sm"
-                            value={address ?? ''}
-                            readOnly
-                          />
-                          <button
-                            type="button"
-                            onClick={() => address && navigator.clipboard.writeText(address)}
-                            className="btn-ghost p-3"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm text-ink-muted mb-2">DID</label>
-                        <input
-                          type="text"
-                          className="input-field font-mono text-sm"
-                          value={agentData?.agent?.did ?? '—'}
-                          readOnly
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm text-ink-muted mb-2">Metadata URI</label>
-                        <input
-                          type="text"
-                          className="input-field font-mono text-sm"
-                          value={agentData?.agent?.metadataURI ?? '—'}
-                          readOnly
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="card">
-                    <h3 className="text-xl font-semibold mb-4 text-ink">Protocol</h3>
-                    <p className="text-ink-muted text-sm">Fee structure and withdrawal are configured in the smart contracts. Use the SDK for transactions.</p>
-                  </div>
-                  <div className="card md:col-span-2">
-                    <h3 className="text-xl font-semibold mb-4 text-ink">Autonomous execution</h3>
-                    <p className="text-ink-muted text-sm mb-3">
-                      Status: <span className="text-ink-subtle font-medium">Not configured</span>. Orders are created on-chain; a worker or webhook can complete them automatically when you configure execution.
-                    </p>
-                    <Link href="/docs/autonomous-agents" className="text-accent hover:underline text-sm font-medium">
-                      Learn how to configure autonomous execution →
-                    </Link>
-                  </div>
-                </div>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <SettingsPanel address={address!} agentData={agentData} />
               </motion.div>
             )}
           </>

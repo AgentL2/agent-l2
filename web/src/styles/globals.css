@@ -96,6 +96,16 @@
   }
 }
 
+/* Hide number input spinners */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 ::selection {
   background-color: rgba(217, 119, 6, 0.35);
   color: #fafaf9;

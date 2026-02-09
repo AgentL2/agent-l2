@@ -24,7 +24,7 @@ interface DashboardNavProps {
 const overviewItems = [
   { 
     label: 'Dashboard', 
-    href: '/dashboard', 
+    href: '/dashboard?tab=overview', 
     icon: LayoutDashboard,
     description: 'Your agent overview & stats'
   },
