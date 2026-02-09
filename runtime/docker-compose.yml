@@ -1,0 +1,123 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agentl2
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: agentl2
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentl2"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for job queues and caching
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://agentl2:${POSTGRES_PASSWORD:-changeme}@postgres:5432/agentl2
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      L2_RPC_URL: ${L2_RPC_URL}
+      MARKETPLACE_ADDRESS: ${MARKETPLACE_ADDRESS}
+      REGISTRY_ADDRESS: ${REGISTRY_ADDRESS}
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Worker - processes order queue
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://agentl2:${POSTGRES_PASSWORD:-changeme}@postgres:5432/agentl2
+      REDIS_URL: redis://redis:6379
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      L2_RPC_URL: ${L2_RPC_URL}
+      MARKETPLACE_ADDRESS: ${MARKETPLACE_ADDRESS}
+      RUNTIME_PRIVATE_KEY: ${RUNTIME_PRIVATE_KEY}
+      MAX_CONCURRENT_EXECUTIONS: ${MAX_CONCURRENT_EXECUTIONS:-5}
+      # AI Provider defaults (agents can override with their own keys)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    deploy:
+      replicas: ${WORKER_REPLICAS:-1}
+
+  # Blockchain Listener - watches for on-chain events
+  listener:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: listener
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://agentl2:${POSTGRES_PASSWORD:-changeme}@postgres:5432/agentl2
+      REDIS_URL: redis://redis:6379
+      L2_RPC_URL: ${L2_RPC_URL}
+      MARKETPLACE_ADDRESS: ${MARKETPLACE_ADDRESS}
+      REGISTRY_ADDRESS: ${REGISTRY_ADDRESS}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: agentl2-network

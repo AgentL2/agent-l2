@@ -158,9 +158,9 @@ export default function HostedRuntimePanel({ address }: HostedRuntimePanelProps)
           <button onClick={fetchAgents} className="btn-ghost p-2" title="Refresh">
             <RefreshCw className="w-5 h-5" />
           </button>
-          <Link href="/dashboard/deploy" className="btn-primary">
+          <Link href="/dashboard/create-agent" className="btn-primary">
             <Plus className="w-4 h-4" />
-            Deploy Agent
+            Create Agent
           </Link>
         </div>
       </div>
@@ -217,34 +217,38 @@ function EmptyState() {
       <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-surface-elevated border border-border flex items-center justify-center">
         <Cpu className="w-10 h-10 text-accent opacity-50" />
       </div>
-      <h3 className="text-2xl font-bold mb-2 text-ink">No Hosted Agents</h3>
+      <h3 className="text-2xl font-bold mb-2 text-ink">No AI Agents Yet</h3>
       <p className="text-ink-muted max-w-md mx-auto mb-6">
-        Deploy an agent to start earning. Your agent data is saved in your browser.
+        Create your first AI agent with custom prompts, tools, and guardrails. 
+        Agents run 24/7 and process orders automatically.
       </p>
-      <Link href="/dashboard/deploy" className="btn-primary inline-flex items-center gap-2 mb-4">
+      <Link href="/dashboard/create-agent" className="btn-primary inline-flex items-center gap-2 mb-4">
         <Plus className="w-4 h-4" />
-        Deploy Agent
+        Create Agent
       </Link>
       <p className="text-xs text-ink-subtle max-w-sm mx-auto">
-        Note: In this MVP, hosted agent data is stored locally in your browser. 
-        Production will use persistent database storage.
+        Agents are stored in the AgentL2 Runtime database and execute real AI workloads.
       </p>
 
-      {/* Template Preview */}
+      {/* Use Cases */}
       <div className="mt-12 pt-8 border-t border-border">
-        <h4 className="text-lg font-semibold mb-4 text-ink">Popular Templates</h4>
+        <h4 className="text-lg font-semibold mb-4 text-ink">What You Can Build</h4>
         <div className="grid md:grid-cols-3 gap-4 max-w-3xl mx-auto">
-          {EXECUTOR_TEMPLATES.filter(t => t.popular).map((template) => (
-            <Link
-              key={template.id}
-              href="/dashboard/deploy"
-              className="card text-left hover:border-accent/50 transition-colors"
-            >
-              <div className="text-3xl mb-2">{template.icon}</div>
-              <h5 className="font-semibold text-ink">{template.name}</h5>
-              <p className="text-xs text-ink-muted line-clamp-2">{template.description}</p>
-            </Link>
-          ))}
+          <div className="card text-left">
+            <div className="text-3xl mb-2">🤖</div>
+            <h5 className="font-semibold text-ink">Customer Support</h5>
+            <p className="text-xs text-ink-muted">Answer questions, resolve issues, escalate when needed</p>
+          </div>
+          <div className="card text-left">
+            <div className="text-3xl mb-2">💻</div>
+            <h5 className="font-semibold text-ink">Code Assistant</h5>
+            <p className="text-xs text-ink-muted">Review code, suggest improvements, find bugs</p>
+          </div>
+          <div className="card text-left">
+            <div className="text-3xl mb-2">📊</div>
+            <h5 className="font-semibold text-ink">Data Analyst</h5>
+            <p className="text-xs text-ink-muted">Extract insights, generate reports, analyze trends</p>
+          </div>
         </div>
       </div>
     </div>

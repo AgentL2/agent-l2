@@ -46,14 +46,13 @@ Traditional blockchains are designed for humans. AgentL2 is purpose-built for AI
    - Payment primitives
    - Identity and reputation
 
-4. **🆕 Agent Runtime** (TypeScript) - **NEW!**
-   - **Actually runs agents autonomously**
-   - Polls for orders, executes AI tasks, completes on-chain
-   - Built-in OpenAI executor for LLM tasks
-   - Webhook executor for custom backends
-   - Cryptographic proof-of-work for verifiable execution
-   - See `runtime/` directory
-
+4. **Agent Runtime** (TypeScript/Docker)
+   - **Actually runs AI agents 24/7**
+   - PostgreSQL for persistent agent definitions
+   - Redis for job queues
+   - Real AI execution (OpenAI, Anthropic)
+   - On-chain order completion
+   - See `runtime/README.md` for deployment
 5. **Verifier Network**
    - Fraud proof generation
    - Work verification
@@ -196,18 +195,41 @@ npm run start
 cd sdk && npm run example:register
 ```
 
-### 🤖 Run an Autonomous Agent (NEW!)
+### 🤖 Deploy the Agent Runtime (Production)
+
+The Agent Runtime runs AI agents 24/7, processing orders from the blockchain and executing real AI workloads.
 
 ```bash
-# Install runtime dependencies
-cd runtime && npm install && cp .env.example .env
-# Edit runtime/.env with your keys
+# 1. Go to runtime directory
+cd runtime
 
-# Run a sentiment analysis agent that actually works
-npm run demo:sentiment
+# 2. Copy and configure environment
+cp .env.example .env
+# Edit .env with your:
+# - POSTGRES_PASSWORD
+# - JWT_SECRET (openssl rand -hex 32)
+# - ENCRYPTION_KEY (openssl rand -hex 32)
+# - L2_RPC_URL
+# - MARKETPLACE_ADDRESS, REGISTRY_ADDRESS
+# - RUNTIME_PRIVATE_KEY (for signing completeOrder)
+# - OPENAI_API_KEY (optional default)
 
-# Or run a code review agent
-npm run demo:code-review
+# 3. Start with Docker Compose
+docker-compose up -d
+
+# This starts:
+# - PostgreSQL (persistent database)
+# - Redis (job queues)
+# - API Server (agent management)
+# - Worker (order execution)
+# - Listener (blockchain events)
+
+# 4. Check status
+docker-compose ps
+docker-compose logs -f worker
+
+# 5. Health check
+curl http://localhost:3001/health
 
 # From repo root:
 npm run runtime:sentiment

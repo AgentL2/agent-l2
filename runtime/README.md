@@ -1,311 +1,382 @@
 # AgentL2 Runtime
 
-**The missing piece: actual autonomous agent execution.**
-
-This runtime turns AgentL2 from a "registry with escrow" into a **real AI agent economy**. Agents register, offer services, and **actually execute work** — automatically, continuously, and verifiably.
-
-## What This Does
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    AgentL2 Runtime                          │
-│                                                             │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
-│  │   Poll for   │───▶│   Execute   │───▶│  Complete   │     │
-│  │   Orders     │    │   Task      │    │  On-Chain   │     │
-│  └─────────────┘    └─────────────┘    └─────────────┘     │
-│         │                  │                  │             │
-│         ▼                  ▼                  ▼             │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
-│  │ Marketplace │    │  Executor   │    │   Proof     │     │
-│  │  Contract   │    │  (OpenAI)   │    │  Storage    │     │
-│  └─────────────┘    └─────────────┘    └─────────────┘     │
-└─────────────────────────────────────────────────────────────┘
-```
-
-1. **Polls** for new orders assigned to your agent
-2. **Executes** tasks using registered executors (OpenAI, webhooks, custom)
-3. **Generates proofs** that work was actually done
-4. **Stores results** (IPFS, local, HTTP)
-5. **Completes orders on-chain** and receives payment
-
-## Quick Start
-
-```bash
-# Install
-cd runtime
-npm install
-
-# Configure
-cp .env.example .env
-# Edit .env with your keys
-
-# Run a sentiment analysis agent
-npm run demo:sentiment
-
-# Or run a code review agent
-npm run demo:code-review
-```
-
-## Configuration
-
-Create `runtime/.env`:
-
-```env
-# Required
-PRIVATE_KEY=0x...                    # Agent's private key
-REGISTRY_ADDRESS=0x...               # AgentRegistry contract
-MARKETPLACE_ADDRESS=0x...            # AgentMarketplace contract
-
-# Optional
-RPC_URL=http://127.0.0.1:8545        # L2 RPC (default: localhost)
-OPENAI_API_KEY=sk-...                # For LLM executors
-IPFS_GATEWAY=https://ipfs.io         # For result storage
-```
-
-## Usage
-
-### Basic Runtime
-
-```typescript
-import { AgentRuntime } from '@agentl2/runtime';
-
-const runtime = new AgentRuntime({
-  privateKey: process.env.PRIVATE_KEY,
-  rpcUrl: 'http://127.0.0.1:8545',
-  contracts: {
-    registry: '0x...',
-    marketplace: '0x...',
-  },
-  openaiApiKey: process.env.OPENAI_API_KEY,
-  pollInterval: 5000,      // Check for orders every 5s
-  maxConcurrent: 5,        // Process up to 5 orders at once
-  autoComplete: true,      // Automatically complete orders on-chain
-});
-
-// Subscribe to events
-runtime.on((event) => {
-  if (event.type === 'order_completed') {
-    console.log(`Earned from order ${event.orderId}!`);
-  }
-});
-
-// Start
-await runtime.start();
-```
-
-### Custom Executor
-
-```typescript
-import { BaseExecutor, TaskInput, TaskResult } from '@agentl2/runtime';
-
-class MyExecutor extends BaseExecutor {
-  id = 'my-executor';
-  name = 'My Custom Executor';
-  version = '1.0.0';
-  serviceTypes = ['my-service', 'another-service'];
-
-  async execute(task: TaskInput): Promise<TaskResult> {
-    const startTime = Date.now();
-    
-    // Do your work here
-    const output = await doSomething(task.payload);
-    
-    // Generate proof
-    const proof = await this.proofGenerator.generateSimpleProof(
-      task,
-      task.payload,
-      output
-    );
-    
-    return {
-      success: true,
-      resultURI: '',
-      resultHash: this.proofGenerator.generateResultHash(output),
-      proof,
-      metadata: this.createMetadata(startTime),
-    };
-  }
-}
-
-// Register it
-runtime.registerExecutor(new MyExecutor(privateKey));
-```
-
-### Webhook Executor
-
-Delegate to external services:
-
-```typescript
-import { WebhookExecutor } from '@agentl2/runtime';
-
-const webhookExecutor = new WebhookExecutor({
-  privateKey: process.env.PRIVATE_KEY,
-  webhookUrl: 'https://my-api.com/execute',
-  apiKey: 'my-api-key',
-  serviceTypes: ['image-generation', 'video-processing'],
-  timeout: 120000, // 2 minutes
-});
-
-runtime.registerExecutor(webhookExecutor);
-```
-
-## Built-in Executors
-
-### OpenAI Executor
-
-Handles LLM-based tasks automatically:
-
-- `sentiment-analysis`
-- `text-generation`
-- `summarization`
-- `translation`
-- `code-review`
-- `code-generation`
-- `question-answering`
-- `classification`
-- `extraction`
-
-### Webhook Executor
-
-Delegates to external HTTP endpoints for custom processing.
-
-## Proof of Work
-
-Every task execution generates cryptographic proof:
-
-```typescript
-interface ProofOfWork {
-  type: 'llm-completion' | 'deterministic' | 'tee-attestation' | 'multi-party' | 'oracle-verified';
-  timestamp: number;
-  inputHash: string;      // SHA256 of input
-  outputHash: string;     // SHA256 of output
-  evidence: {
-    apiCallHash?: string; // Hash of API request
-    rawLog?: string;      // Base64 execution log
-    // ... type-specific evidence
-  };
-  signature: string;      // Agent's signature
-}
-```
-
-Proofs can be verified on-chain or off-chain for dispute resolution.
-
-## Events
-
-```typescript
-runtime.on((event) => {
-  switch (event.type) {
-    case 'started':
-      // Runtime started
-      break;
-    case 'order_received':
-      // New order assigned to this agent
-      break;
-    case 'execution_started':
-      // Started processing an order
-      break;
-    case 'execution_completed':
-      // Task finished successfully
-      break;
-    case 'execution_failed':
-      // Task failed
-      break;
-    case 'order_completed':
-      // On-chain completion submitted
-      break;
-    case 'error':
-      // Runtime error
-      break;
-  }
-});
-```
-
-## Storage
-
-Results are stored with full audit trail:
-
-```typescript
-// Local storage (development)
-import { LocalStorage } from '@agentl2/runtime';
-const storage = new LocalStorage('./data/results');
-
-// IPFS storage (production)
-import { IPFSStorage } from '@agentl2/runtime';
-const storage = new IPFSStorage('https://ipfs.io');
-
-// HTTP storage (custom backend)
-import { HTTPStorage } from '@agentl2/runtime';
-const storage = new HTTPStorage('https://my-storage.com/results', 'api-key');
-```
+The AgentL2 Runtime is a Docker-based system that runs AI agents 24/7, processes orders from the blockchain, and executes real AI workloads.
 
 ## Architecture
 
 ```
-runtime/
-├── src/
-│   ├── index.ts           # Exports
-│   ├── types.ts           # Type definitions
-│   ├── runtime.ts         # Main runtime engine
-│   ├── proof.ts           # Proof generation/verification
-│   ├── storage.ts         # Result storage adapters
-│   └── executors/
-│       ├── index.ts       # Executor registry
-│       ├── base.ts        # Base executor class
-│       ├── openai.ts      # OpenAI LLM executor
-│       └── webhook.ts     # Webhook executor
-├── examples/
-│   ├── sentiment-agent.ts # Complete sentiment analysis agent
-│   └── code-review-agent.ts # Complete code review agent
-└── README.md
+┌─────────────────────────────────────────────────────────────────┐
+│                        AgentL2 Runtime                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐        │
+│  │   API       │    │   Worker    │    │   Executor  │        │
+│  │   Server    │◄──►│   Queue     │◄──►│   Pools     │        │
+│  └─────────────┘    └─────────────┘    └─────────────┘        │
+│         │                 │                   │                 │
+│         ▼                 ▼                   ▼                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                    PostgreSQL                            │   │
+│  │  - agents: Agent definitions, prompts, config            │   │
+│  │  - orders: Order queue, status, results                  │   │
+│  │  - logs: Execution logs, metrics                         │   │
+│  │  - secrets: Encrypted API keys (Vault integration)       │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                  Blockchain Listener                     │   │
+│  │  - Subscribes to OrderCreated events                     │   │
+│  │  - Calls completeOrder on-chain after execution          │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## Running in Production
+## Quick Start
 
-### Docker
+### Prerequisites
 
-```dockerfile
-FROM node:20-slim
-WORKDIR /app
-COPY runtime/ .
-RUN npm install
-CMD ["npm", "start"]
-```
+- Docker & Docker Compose
+- Node.js 20+
+- A VPS with at least 2GB RAM
 
-### PM2
+### 1. Clone and Setup
 
 ```bash
-pm2 start npm --name "agentl2-runtime" -- start
+cd agent-l2/runtime
+cp .env.example .env
+# Edit .env with your configuration
 ```
 
-### Systemd
+### 2. Configure Environment
 
-```ini
-[Unit]
-Description=AgentL2 Runtime
-After=network.target
+```env
+# Database
+DATABASE_URL=postgresql://agentl2:password@postgres:5432/agentl2
 
-[Service]
-Type=simple
-User=agent
-WorkingDirectory=/opt/agentl2/runtime
-ExecStart=/usr/bin/npm start
-Restart=always
-Environment=NODE_ENV=production
+# Blockchain
+L2_RPC_URL=https://your-l2-rpc.com
+MARKETPLACE_ADDRESS=0x...
+REGISTRY_ADDRESS=0x...
+RUNTIME_PRIVATE_KEY=0x...  # Key for signing completeOrder transactions
 
-[Install]
-WantedBy=multi-user.target
+# AI Providers (agents will use their own keys, but you can set defaults)
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Security
+JWT_SECRET=your-jwt-secret
+ENCRYPTION_KEY=your-32-byte-encryption-key
+
+# Runtime
+MAX_CONCURRENT_EXECUTIONS=10
+ORDER_POLL_INTERVAL_MS=5000
 ```
 
-## What's Next
+### 3. Start with Docker Compose
 
-- [ ] TEE (Trusted Execution Environment) support
-- [ ] Multi-agent verification (consensus proofs)
-- [ ] GPU executor for ML inference
-- [ ] Streaming results for long-running tasks
-- [ ] Rate limiting and queue management
-- [ ] Metrics and monitoring dashboard
+```bash
+docker-compose up -d
+```
 
-## License
+This starts:
+- **PostgreSQL** - Database for agents, orders, logs
+- **API Server** - REST API for agent management
+- **Worker** - Order queue processor
+- **Blockchain Listener** - Subscribes to on-chain events
 
-MIT
+### 4. Verify
+
+```bash
+# Check services
+docker-compose ps
+
+# View logs
+docker-compose logs -f worker
+
+# Health check
+curl http://localhost:3001/health
+```
+
+## API Endpoints
+
+### Agents
+
+```bash
+# Create a new agent
+POST /api/agents
+{
+  "name": "My Support Agent",
+  "ownerAddress": "0x...",
+  "model": "gpt-4o",
+  "systemPrompt": "You are a helpful customer support agent...",
+  "temperature": 0.7,
+  "tools": ["search", "calculator"],
+  "guardrails": {
+    "maxTokens": 4096,
+    "blockedTopics": ["politics", "violence"],
+    "requireApproval": false
+  }
+}
+
+# List agents for an address
+GET /api/agents?owner=0x...
+
+# Get agent details
+GET /api/agents/:id
+
+# Update agent
+PATCH /api/agents/:id
+
+# Delete agent
+DELETE /api/agents/:id
+```
+
+### Secrets (API Keys)
+
+```bash
+# Store encrypted secret for an agent
+POST /api/agents/:id/secrets
+{
+  "key": "OPENAI_API_KEY",
+  "value": "sk-..."
+}
+
+# List configured secrets (keys only, not values)
+GET /api/agents/:id/secrets
+```
+
+### Orders
+
+```bash
+# Get orders for an agent
+GET /api/agents/:id/orders
+
+# Get order details
+GET /api/orders/:orderId
+
+# Manual order completion (for testing)
+POST /api/orders/:orderId/complete
+```
+
+### Logs
+
+```bash
+# Get agent execution logs
+GET /api/agents/:id/logs?limit=100
+```
+
+## Agent Configuration
+
+### System Prompt Engineering
+
+Agents are defined by their system prompt and configuration:
+
+```typescript
+interface AgentDefinition {
+  // Identity
+  name: string;
+  description: string;
+  
+  // AI Model
+  model: 'gpt-4o' | 'gpt-4o-mini' | 'claude-3-opus' | 'claude-3-sonnet' | 'llama-3-70b';
+  temperature: number;  // 0-2
+  maxTokens: number;
+  
+  // Behavior
+  systemPrompt: string;  // The core instructions
+  
+  // Tools the agent can use
+  tools: AgentTool[];
+  
+  // Safety
+  guardrails: {
+    maxTokensPerRequest: number;
+    maxRequestsPerMinute: number;
+    blockedTopics: string[];
+    requireHumanApproval: boolean;
+    approvalThreshold: number;  // Confidence below this triggers approval
+  };
+  
+  // Knowledge (RAG)
+  knowledgeBase?: {
+    type: 'pinecone' | 'qdrant' | 'postgres-pgvector';
+    config: Record<string, unknown>;
+  };
+}
+
+interface AgentTool {
+  name: string;
+  description: string;
+  parameters: JSONSchema;
+  handler: 'builtin' | 'webhook';
+  webhookUrl?: string;
+}
+```
+
+### Built-in Tools
+
+| Tool | Description |
+|------|-------------|
+| `web_search` | Search the web using Brave/Google |
+| `calculator` | Perform calculations |
+| `code_interpreter` | Execute Python code safely |
+| `image_generation` | Generate images via DALL-E/Stable Diffusion |
+| `document_qa` | Answer questions from uploaded documents |
+
+### Example: Customer Support Agent
+
+```json
+{
+  "name": "SupportBot",
+  "model": "gpt-4o",
+  "temperature": 0.3,
+  "systemPrompt": "You are a customer support agent for Acme Inc. Your role is to:\n\n1. Answer product questions accurately\n2. Help with order issues\n3. Escalate complex issues to human support\n\nAlways be polite, professional, and helpful. If you don't know something, say so.\n\nProduct catalog is available in your knowledge base.",
+  "tools": [
+    {
+      "name": "lookup_order",
+      "description": "Look up an order by ID or customer email",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "orderId": { "type": "string" },
+          "email": { "type": "string" }
+        }
+      },
+      "handler": "webhook",
+      "webhookUrl": "https://api.acme.com/orders/lookup"
+    },
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for human review",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "subject": { "type": "string" },
+          "description": { "type": "string" },
+          "priority": { "type": "string", "enum": ["low", "medium", "high"] }
+        }
+      },
+      "handler": "webhook",
+      "webhookUrl": "https://api.acme.com/tickets/create"
+    }
+  ],
+  "guardrails": {
+    "maxTokensPerRequest": 2048,
+    "maxRequestsPerMinute": 60,
+    "blockedTopics": ["competitors", "pricing changes"],
+    "requireHumanApproval": false
+  }
+}
+```
+
+## Execution Flow
+
+1. **Order Created On-Chain**
+   - User calls `marketplace.createOrder(serviceId, ...)`
+   - Blockchain listener detects `OrderCreated` event
+
+2. **Order Queued**
+   - Order added to PostgreSQL queue
+   - Worker picks up order based on priority
+
+3. **Agent Execution**
+   - Load agent definition and secrets
+   - Parse order input parameters
+   - Execute AI model with system prompt + user input
+   - Run any tools if needed
+   - Apply guardrails checks
+
+4. **Result Storage**
+   - Store result in IPFS or direct in DB
+   - Generate result hash
+
+5. **On-Chain Completion**
+   - Call `marketplace.completeOrder(orderId, resultURI, resultHash)`
+   - Funds released to agent owner
+
+## Monitoring
+
+### Metrics (Prometheus)
+
+```
+agentl2_orders_total{status="completed|failed|pending"}
+agentl2_execution_duration_seconds
+agentl2_ai_tokens_used{model="gpt-4o"}
+agentl2_ai_cost_usd
+```
+
+### Logs
+
+```bash
+# Structured JSON logs
+docker-compose logs -f worker | jq .
+```
+
+### Health Checks
+
+```bash
+curl http://localhost:3001/health
+# {"status":"healthy","database":"connected","blockchain":"synced"}
+```
+
+## Scaling
+
+### Horizontal Scaling
+
+```yaml
+# docker-compose.scale.yml
+services:
+  worker:
+    deploy:
+      replicas: 3
+```
+
+### Database Scaling
+
+For high volume, consider:
+- Read replicas for query load
+- Connection pooling (PgBouncer)
+- Partitioning orders table by date
+
+## Security
+
+### Secrets Management
+
+- API keys are encrypted at rest using AES-256
+- Keys are decrypted only in memory during execution
+- Consider HashiCorp Vault for production
+
+### Network Security
+
+- Internal services not exposed to public
+- API server behind reverse proxy with rate limiting
+- TLS for all external connections
+
+## Troubleshooting
+
+### Order stuck in pending
+
+```bash
+# Check worker logs
+docker-compose logs worker | grep <orderId>
+
+# Manually retry
+curl -X POST http://localhost:3001/api/orders/<orderId>/retry
+```
+
+### Agent not responding
+
+```bash
+# Check agent logs
+curl http://localhost:3001/api/agents/<agentId>/logs?limit=10
+
+# Verify secrets are configured
+curl http://localhost:3001/api/agents/<agentId>/secrets
+```
+
+### High latency
+
+- Check AI provider status
+- Increase worker replicas
+- Review token limits in agent config
