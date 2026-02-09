@@ -85,3 +85,56 @@ export function useToast() {
   }
   return ctx;
 }
+
+/**
+ * Parse blockchain/wallet errors into user-friendly messages
+ */
+export function parseTransactionError(error: unknown): string {
+  const errorStr = String(error);
+  const errorLower = errorStr.toLowerCase();
+
+  // User rejected/denied
+  if (
+    errorLower.includes('user rejected') ||
+    errorLower.includes('user denied') ||
+    errorLower.includes('rejected') ||
+    errorLower.includes('action_rejected') ||
+    errorLower.includes('4001')
+  ) {
+    return 'Transaction cancelled';
+  }
+
+  // Insufficient funds
+  if (
+    errorLower.includes('insufficient funds') ||
+    errorLower.includes('insufficient balance')
+  ) {
+    return 'Insufficient funds for this transaction';
+  }
+
+  // Gas estimation failed
+  if (errorLower.includes('gas required exceeds') || errorLower.includes('out of gas')) {
+    return 'Transaction would fail. Please check your inputs.';
+  }
+
+  // Network issues
+  if (
+    errorLower.includes('network') ||
+    errorLower.includes('timeout') ||
+    errorLower.includes('disconnected')
+  ) {
+    return 'Network error. Please try again.';
+  }
+
+  // Contract revert with reason
+  if (errorLower.includes('revert') || errorLower.includes('execution reverted')) {
+    const match = errorStr.match(/reason="([^"]+)"/);
+    if (match) {
+      return `Transaction failed: ${match[1]}`;
+    }
+    return 'Transaction failed. The contract rejected this request.';
+  }
+
+  // Generic fallback - don't expose raw error
+  return 'Transaction failed. Please try again.';
+}

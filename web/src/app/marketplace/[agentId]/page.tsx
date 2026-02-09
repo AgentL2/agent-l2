@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ethers } from 'ethers';
 import { useWallet } from '@/contexts/WalletContext';
+import { useToast, parseTransactionError } from '@/contexts/ToastContext';
 import DashboardNav from '@/components/dashboard/DashboardNav';
 import { getAgent, formatEth, type AgentDetailResponse } from '@/lib/api';
 import { createOrder as doCreateOrder, isWritesConfigured } from '@/lib/writes';
@@ -28,10 +29,10 @@ export default function AgentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { address, isConnecting, connect, getSigner } = useWallet();
+  const { showToast } = useToast();
   const [purchaseServiceId, setPurchaseServiceId] = useState<string>('');
   const [purchaseUnits, setPurchaseUnits] = useState<string>('1');
   const [purchaseLoading, setPurchaseLoading] = useState(false);
-  const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [purchaseTxHash, setPurchaseTxHash] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<AgentMetadata | null>(null);
   
@@ -75,21 +76,20 @@ export default function AgentDetailPage() {
     if (!service) return;
     const signer = await getSigner();
     if (!signer) {
-      setPurchaseError('Connect your wallet first.');
+      showToast('Please connect your wallet first', 'error');
       return;
     }
     if (!isWritesConfigured()) {
-      setPurchaseError('Chain not configured.');
+      showToast('Chain not configured. Please check network settings.', 'error');
       return;
     }
     const units = BigInt(purchaseUnits || '1');
     if (units < 1n) {
-      setPurchaseError('Units must be at least 1.');
+      showToast('Units must be at least 1', 'error');
       return;
     }
     const priceWei = BigInt(service?.pricePerUnit ?? 0) * units;
     setPurchaseLoading(true);
-    setPurchaseError(null);
     setPurchaseTxHash(null);
     try {
       const { orderId, txHash } = await doCreateOrder(
@@ -102,12 +102,14 @@ export default function AgentDetailPage() {
       setPurchaseTxHash(txHash);
       setPurchaseServiceId('');
       setPurchaseUnits('1');
+      showToast('Order created successfully!', 'success');
     } catch (e) {
-      setPurchaseError(e instanceof Error ? e.message : 'Transaction failed');
+      const message = parseTransactionError(e);
+      showToast(message, 'error');
     } finally {
       setPurchaseLoading(false);
     }
-  }, [purchaseServiceId, purchaseUnits, data, getSigner]);
+  }, [purchaseServiceId, purchaseUnits, data, getSigner, showToast]);
 
   const handleTryAgent = async () => {
     if (!tryInput.trim()) return;
@@ -642,10 +644,6 @@ const result = await client.getOrderResult(order.orderId);`}
                         </div>
                       );
                     })()}
-
-                    {purchaseError && (
-                      <p className="text-red-400 text-sm">{purchaseError}</p>
-                    )}
 
                     {purchaseTxHash && (
                       <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">

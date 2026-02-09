@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, ChevronRight, Check, Loader2, Zap, Bot,
-  DollarSign, AlertTriangle, CheckCircle2, Package
+  DollarSign, CheckCircle2, Package
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ethers } from 'ethers';
 import { useWallet } from '@/contexts/WalletContext';
+import { useToast, parseTransactionError } from '@/contexts/ToastContext';
 import DashboardNav from '@/components/dashboard/DashboardNav';
 import { isWritesConfigured, registerService as doRegisterService } from '@/lib/writes';
 
@@ -45,10 +46,10 @@ interface Agent {
 export default function CreateServicePage() {
   const router = useRouter();
   const { address, connect, isConnecting, getSigner } = useWallet();
+  const { showToast } = useToast();
   
   const [step, setStep] = useState<Step>('agent');
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [serviceId, setServiceId] = useState<string | null>(null);
   
@@ -99,17 +100,16 @@ export default function CreateServicePage() {
     
     const signer = await getSigner();
     if (!signer) {
-      setError('Could not get wallet signer');
+      showToast('Please connect your wallet first', 'error');
       return;
     }
 
     if (!isWritesConfigured()) {
-      setError('Chain not configured. Contracts not deployed.');
+      showToast('Chain not configured. Please check network settings.', 'error');
       return;
     }
 
     setCreating(true);
-    setError(null);
 
     try {
       const serviceType = config.serviceType === 'custom' ? config.customType : config.serviceType;
@@ -126,8 +126,10 @@ export default function CreateServicePage() {
       setTxHash(result.txHash);
       setServiceId(result.serviceId);
       setStep('success');
+      showToast('Service created successfully!', 'success');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create service');
+      const message = parseTransactionError(err);
+      showToast(message, 'error');
     } finally {
       setCreating(false);
     }
@@ -245,14 +247,6 @@ export default function CreateServicePage() {
             />
           )}
         </AnimatePresence>
-
-        {/* Error */}
-        {error && (
-          <div className="mt-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 shrink-0" />
-            {error}
-          </div>
-        )}
 
         {/* Footer Actions */}
         {step !== 'success' && step !== 'agent' && (
