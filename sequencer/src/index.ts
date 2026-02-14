@@ -26,6 +26,10 @@ const L1_POLL_INTERVAL_MS = Math.max(5000, Number(process.env.L1_POLL_INTERVAL_M
 
 const isL1Configured = !!(L1_RPC_URL && L1_BRIDGE_ADDRESS);
 
+// Track last processed block to avoid re-scanning from genesis
+let lastProcessedL2Block = 0;
+let lastProcessedL1Block = 0;
+
 function getConfirmationsL2(): number {
   const u = (L2_RPC_URL || "").toLowerCase();
   return u.includes("localhost") || u.includes("127.0.0.1") ? 0 : 1;
@@ -60,12 +64,30 @@ async function main() {
   const app = express();
   app.use(express.json());
   app.use((_req, res, next) => {
-    res.setHeader("Access-Control-Allow-Origin", "*");
+    const allowedOrigins = (process.env.ALLOWED_ORIGINS || "http://localhost:3000").split(",");
+    const origin = _req.headers.origin || "";
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+    }
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     next();
   });
   app.options("*", (_req, res) => res.sendStatus(204));
+
+  // Optional API key authentication for mutating endpoints
+  const API_KEY = process.env.SEQUENCER_API_KEY;
+  if (API_KEY) {
+    app.use((req, res, next) => {
+      if (req.path === "/health") return next();
+      const key = req.headers["x-api-key"] || req.query.apiKey;
+      if (key !== API_KEY) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      next();
+    });
+  }
 
   app.get("/health", (_req: Request, res: Response) => {
     res.json({ status: "ok", l2Bridge: L2_BRIDGE_ADDRESS, l1Bridge: L1_BRIDGE_ADDRESS || null });
@@ -123,7 +145,7 @@ async function main() {
       const block = await l2Provider.getBlock("latest");
       if (!block) return;
       const now = BigInt(block.timestamp);
-      const fromBlock = 0;
+      const fromBlock = lastProcessedL2Block || Math.max(0, block.number - 10000);
       const events = await l2Bridge.queryFilter(
         l2Bridge.filters.WithdrawalInitiated(),
         fromBlock,
@@ -155,6 +177,7 @@ async function main() {
           console.error("finalizeWithdrawal failed for", withdrawalId, err);
         }
       }
+      if (block) lastProcessedL2Block = block.number;
     } catch (e) {
       console.error("pollAndFinalizeWithdrawals error:", e);
     }
@@ -165,7 +188,8 @@ async function main() {
     try {
       const l1Provider = new ethers.JsonRpcProvider(L1_RPC_URL);
       const l1BridgeRead = new ethers.Contract(L1_BRIDGE_ADDRESS, L1_BRIDGE_ABI, l1Provider);
-      const fromBlock = 0;
+      const l1Block = await l1Provider.getBlock("latest");
+      const fromBlock = lastProcessedL1Block || Math.max(0, (l1Block?.number ?? 0) - 10000);
       const events = await l1BridgeRead.queryFilter(
         l1BridgeRead.filters.DepositInitiated(),
         fromBlock,
@@ -188,6 +212,7 @@ async function main() {
           console.error("processDeposit failed for", depositId, err);
         }
       }
+      if (l1Block) lastProcessedL1Block = l1Block.number;
     } catch (e) {
       console.error("pollL1Deposits error:", e);
     }

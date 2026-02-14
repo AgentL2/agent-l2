@@ -111,6 +111,21 @@ export class AgentClient {
     }
   }
 
+  private async withRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+    for (let i = 0; i <= retries; i++) {
+      try {
+        return await fn();
+      } catch (err: any) {
+        if (i === retries) throw err;
+        const isTransient = err?.code === 'NETWORK_ERROR' || err?.code === 'TIMEOUT' ||
+          err?.code === 'SERVER_ERROR' || err?.message?.includes('nonce');
+        if (!isTransient) throw err;
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+      }
+    }
+    throw new Error('Retry failed');
+  }
+
   /** Resolve chain ID (for 0-conf on local). */
   private async getConfirmations(): Promise<number> {
     if (this.chainId === 1337) return 0;
@@ -124,7 +139,7 @@ export class AgentClient {
   }
 
   static generateDID(address: string): string {
-    return `did:key:z${address.slice(2, 50)}`;
+    return `did:ethr:${address}`;
   }
 
   async register(metadataURI: string): Promise<string> {

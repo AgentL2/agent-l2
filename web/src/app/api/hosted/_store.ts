@@ -10,6 +10,32 @@
  */
 
 import { randomBytes, createCipheriv, createDecipheriv } from 'crypto';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
+
+const DATA_DIR = join(process.cwd(), '.data');
+const STORE_FILE = join(DATA_DIR, 'hosted-agents.json');
+
+function loadStore(): Map<string, any> {
+  try {
+    if (existsSync(STORE_FILE)) {
+      const data = JSON.parse(readFileSync(STORE_FILE, 'utf-8'));
+      return new Map(Object.entries(data));
+    }
+  } catch {
+    // Ignore load errors
+  }
+  return new Map();
+}
+
+function saveStore(store: Map<string, any>): void {
+  try {
+    if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+    writeFileSync(STORE_FILE, JSON.stringify(Object.fromEntries(store), null, 2));
+  } catch {
+    // Ignore save errors
+  }
+}
 
 // ============================================================================
 // Types
@@ -64,7 +90,7 @@ const ENCRYPTION_KEY = process.env.SECRETS_ENCRYPTION_KEY ||
   'agentl2-dev-key-replace-in-prod!!';
 
 class HostedAgentsStore {
-  private agents = new Map<string, HostedAgentData>();
+  private agents = loadStore() as Map<string, HostedAgentData>;
   private logs = new Map<string, HostedAgentLog[]>();
   private idCounter = 0;
 
@@ -84,8 +110,9 @@ class HostedAgentsStore {
     };
 
     this.agents.set(id, agent);
+    saveStore(this.agents);
     this.logs.set(id, []);
-    
+
     this.addLog(id, 'info', `Agent "${data.name}" created with template: ${data.templateId}`);
     
     return agent;
@@ -115,11 +142,13 @@ class HostedAgentsStore {
     };
 
     this.agents.set(id, updated);
+    saveStore(this.agents);
     return this.sanitizeAgent(updated);
   }
 
   deleteAgent(id: string): boolean {
     const deleted = this.agents.delete(id);
+    saveStore(this.agents);
     this.logs.delete(id);
     return deleted;
   }
@@ -156,6 +185,7 @@ class HostedAgentsStore {
     agent.stats[field]++;
     agent.stats.lastActiveAt = Date.now();
     agent.updatedAt = Date.now();
+    saveStore(this.agents);
   }
 
   addEarnings(id: string, amount: bigint): void {
@@ -165,6 +195,7 @@ class HostedAgentsStore {
     const current = BigInt(agent.stats.totalEarnings || '0');
     agent.stats.totalEarnings = (current + amount).toString();
     agent.updatedAt = Date.now();
+    saveStore(this.agents);
   }
 
   // ========== Logs ==========

@@ -10,6 +10,48 @@ import type { Agent, OrderInput, OrderResult, AgentTool } from '../shared/types.
 const logger = pino({ name: 'executor' });
 
 /**
+ * Retry wrapper for transient API failures (rate limits, timeouts, server errors)
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: { maxRetries?: number; baseDelayMs?: number; operation?: string } = {}
+): Promise<T> {
+  const { maxRetries = 3, baseDelayMs = 1000, operation = 'operation' } = options;
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      const isRetryable =
+        lastError.message.includes('429') ||
+        lastError.message.includes('rate limit') ||
+        lastError.message.includes('timeout') ||
+        lastError.message.includes('ECONNRESET') ||
+        lastError.message.includes('ETIMEDOUT') ||
+        lastError.message.includes('500') ||
+        lastError.message.includes('502') ||
+        lastError.message.includes('503') ||
+        lastError.message.includes('overloaded');
+
+      if (!isRetryable || attempt === maxRetries) {
+        throw lastError;
+      }
+
+      const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * 500;
+      logger.warn(
+        { attempt: attempt + 1, maxRetries, delay: Math.round(delay), operation },
+        `Retrying ${operation} after transient failure: ${lastError.message}`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError || new Error(`${operation} failed after ${maxRetries} retries`);
+}
+
+/**
  * Execute an agent with the given input
  */
 export async function executeAgent(
@@ -75,14 +117,17 @@ async function executeOpenAI(
     ? agent.tools.map(toolToOpenAI)
     : undefined;
 
-  const response = await client.chat.completions.create({
+  const response = await withRetry(
+    () => client.chat.completions.create({
     model: agent.model,
     messages,
     temperature: agent.temperature,
     max_tokens: Math.min(agent.maxTokens, agent.guardrails.maxTokensPerRequest),
     tools,
     ...(params || {}),
-  });
+  }),
+    { operation: 'OpenAI API call' }
+  );
 
   const choice = response.choices[0];
   const toolCalls: OrderResult['toolCalls'] = [];
@@ -223,15 +268,75 @@ async function executeBuiltinTool(
 
 function executeCalculator(input: Record<string, unknown>): unknown {
   const expression = input.expression as string;
-  // Safe eval using Function constructor (only math)
   try {
-    // Only allow numbers, operators, parentheses, and Math functions
-    const sanitized = expression.replace(/[^0-9+\-*/().%\s]/g, '');
-    const result = Function(`"use strict"; return (${sanitized})`)();
+    const result = safeEvaluate(expression);
     return { result };
   } catch (err) {
-    return { error: 'Invalid expression' };
+    return { error: err instanceof Error ? err.message : 'Invalid expression' };
   }
+}
+
+/**
+ * Safe math expression evaluator using recursive descent parsing.
+ * Supports: +, -, *, /, %, parentheses, and decimal numbers.
+ * No eval(), no Function(), no code injection possible.
+ */
+function safeEvaluate(expr: string): number {
+  let pos = 0;
+  const str = expr.replace(/\s+/g, '');
+
+  function parseExpression(): number {
+    let result = parseTerm();
+    while (pos < str.length && (str[pos] === '+' || str[pos] === '-')) {
+      const op = str[pos++];
+      const term = parseTerm();
+      result = op === '+' ? result + term : result - term;
+    }
+    return result;
+  }
+
+  function parseTerm(): number {
+    let result = parseFactor();
+    while (pos < str.length && (str[pos] === '*' || str[pos] === '/' || str[pos] === '%')) {
+      const op = str[pos++];
+      const factor = parseFactor();
+      if (op === '/' && factor === 0) throw new Error('Division by zero');
+      result = op === '*' ? result * factor : op === '/' ? result / factor : result % factor;
+    }
+    return result;
+  }
+
+  function parseFactor(): number {
+    // Handle unary minus
+    if (str[pos] === '-') {
+      pos++;
+      return -parseFactor();
+    }
+    // Handle unary plus
+    if (str[pos] === '+') {
+      pos++;
+      return parseFactor();
+    }
+    // Handle parentheses
+    if (str[pos] === '(') {
+      pos++; // skip '('
+      const result = parseExpression();
+      if (str[pos] !== ')') throw new Error('Mismatched parentheses');
+      pos++; // skip ')'
+      return result;
+    }
+    // Parse number
+    const start = pos;
+    while (pos < str.length && (str[pos] >= '0' && str[pos] <= '9' || str[pos] === '.')) {
+      pos++;
+    }
+    if (start === pos) throw new Error(`Unexpected character: ${str[pos] || 'end of input'}`);
+    return parseFloat(str.slice(start, pos));
+  }
+
+  const result = parseExpression();
+  if (pos < str.length) throw new Error(`Unexpected character: ${str[pos]}`);
+  return result;
 }
 
 async function executeWebSearch(

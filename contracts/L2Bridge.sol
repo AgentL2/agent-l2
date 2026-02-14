@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title L2Bridge
@@ -10,7 +11,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  *      after a delay. Anyone can challenge fraudulent deposits or withdrawals during
  *      the fraud proof window to protect agents and users.
  */
-contract L2Bridge is ReentrancyGuard {
+contract L2Bridge is ReentrancyGuard, Ownable {
     // -------------------------------------------------------------------------
     // Errors (audit-friendly; gas-efficient)
     // -------------------------------------------------------------------------
@@ -74,7 +75,7 @@ contract L2Bridge is ReentrancyGuard {
         _;
     }
 
-    constructor(address _sequencer) {
+    constructor(address _sequencer) Ownable(msg.sender) {
         if (_sequencer == address(0)) revert InvalidAddress();
         sequencer = _sequencer;
     }
@@ -120,6 +121,7 @@ contract L2Bridge is ReentrancyGuard {
      * @param depositId The deposit to challenge.
      */
     function challengeDeposit(bytes32 depositId) external nonReentrant {
+        require(msg.sender == owner(), "L2Bridge: only owner can challenge deposits");
         Deposit storage d = deposits[depositId];
         if (!d.processed) revert DepositNotFound();
         if (d.challenged) revert DepositAlreadyChallenged();
@@ -197,6 +199,7 @@ contract L2Bridge is ReentrancyGuard {
      * @param withdrawalId The withdrawal to challenge.
      */
     function challengeWithdrawal(bytes32 withdrawalId) external nonReentrant {
+        require(msg.sender == owner(), "L2Bridge: only owner can challenge withdrawals");
         Withdrawal storage w = withdrawals[withdrawalId];
         if (w.l2Address == address(0)) revert WithdrawalNotFound();
         if (w.finalized) revert WithdrawalAlreadyFinalized();

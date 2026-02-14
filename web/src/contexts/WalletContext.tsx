@@ -35,6 +35,37 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       if (accounts?.length) {
         setAddress(ethers.getAddress(accounts[0]));
       }
+      // Verify chain — switch to the correct network if needed
+      const expectedChainId = process.env.NEXT_PUBLIC_CHAIN_ID || '10143'; // Monad testnet
+      try {
+        const network = await web3.getNetwork();
+        if (network.chainId.toString() !== expectedChainId) {
+          try {
+            await provider.request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: '0x' + parseInt(expectedChainId).toString(16) }],
+            });
+          } catch (switchErr: any) {
+            // Chain not added — try to add it
+            if (switchErr?.code === 4902) {
+              await provider.request({
+                method: 'wallet_addEthereumChain',
+                params: [{
+                  chainId: '0x' + parseInt(expectedChainId).toString(16),
+                  chainName: 'Monad Testnet',
+                  nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
+                  rpcUrls: ['https://testnet-rpc.monad.xyz'],
+                  blockExplorerUrls: ['https://testnet.monadexplorer.com'],
+                }],
+              });
+            } else {
+              console.warn('Could not switch chain:', switchErr);
+            }
+          }
+        }
+      } catch (chainErr) {
+        console.warn('Chain verification failed:', chainErr);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to connect');
     } finally {
@@ -67,9 +98,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       if (accounts?.length) setAddress(ethers.getAddress(accounts[0]));
       else setAddress(null);
     };
+    const handleChainChanged = () => {
+      // Reload the page on chain change as recommended by MetaMask
+      if (typeof window !== 'undefined') window.location.reload();
+    };
     provider.on?.('accountsChanged', handleAccounts);
+    provider.on?.('chainChanged', handleChainChanged);
     return () => {
       provider.removeListener?.('accountsChanged', handleAccounts);
+      provider.removeListener?.('chainChanged', handleChainChanged);
     };
   }, []);
 

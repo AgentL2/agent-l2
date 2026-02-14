@@ -62,6 +62,7 @@ export class AgentRuntime {
   private heartbeatTimer?: ReturnType<typeof setInterval>;
   private processingOrders = new Set<string>();
   private processedOrders = new Set<string>();
+  private processedOrdersFile: string;
 
   constructor(config: RuntimeConfig) {
     this.config = config;
@@ -78,6 +79,10 @@ export class AgentRuntime {
     } else {
       this.storage = new LocalStorage('./data/results');
     }
+
+    // Load persisted processed orders
+    this.processedOrdersFile = './data/processed-orders.json';
+    this.loadProcessedOrders();
 
     // Register default executors
     if (config.openaiApiKey) {
@@ -264,6 +269,7 @@ export class AgentRuntime {
           await this.processOrder(orderId);
         } else {
           this.processedOrders.add(orderId);
+          this.persistProcessedOrders();
         }
       }
     } catch (error) {
@@ -286,6 +292,7 @@ export class AgentRuntime {
           this.processOrder(orderId);
         } else {
           this.processedOrders.add(orderId);
+          this.persistProcessedOrders();
         }
       }
 
@@ -316,6 +323,7 @@ export class AgentRuntime {
       if (Number(order.status) !== OrderStatus.Pending) {
         console.log(`[Runtime] Order ${orderId.slice(0, 10)}... is not pending, skipping`);
         this.processedOrders.add(orderId);
+        this.persistProcessedOrders();
         return;
       }
 
@@ -324,6 +332,7 @@ export class AgentRuntime {
       if (Date.now() / 1000 > deadline) {
         console.log(`[Runtime] Order ${orderId.slice(0, 10)}... has passed deadline, skipping`);
         this.processedOrders.add(orderId);
+        this.persistProcessedOrders();
         return;
       }
 
@@ -391,6 +400,7 @@ export class AgentRuntime {
       }
 
       this.processedOrders.add(orderId);
+      this.persistProcessedOrders();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       console.error(`[Runtime] Error processing order ${orderId.slice(0, 10)}...:`, message);
@@ -438,6 +448,32 @@ export class AgentRuntime {
     }
 
     return {};
+  }
+
+  private loadProcessedOrders(): void {
+    try {
+      const fs = require('fs');
+      if (fs.existsSync(this.processedOrdersFile)) {
+        const data = JSON.parse(fs.readFileSync(this.processedOrdersFile, 'utf-8'));
+        for (const id of data) {
+          this.processedOrders.add(id);
+        }
+        console.log(`[Runtime] Loaded ${this.processedOrders.size} previously processed orders`);
+      }
+    } catch {
+      // Ignore errors loading cache
+    }
+  }
+
+  private persistProcessedOrders(): void {
+    try {
+      const fs = require('fs');
+      const dir = require('path').dirname(this.processedOrdersFile);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(this.processedOrdersFile, JSON.stringify([...this.processedOrders]));
+    } catch {
+      // Ignore errors persisting cache
+    }
   }
 
   // ============================================================================

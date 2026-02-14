@@ -3,6 +3,8 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 /**
  * @title ERC8004 - Autonomous Agent Account
@@ -40,6 +42,9 @@ contract ERC8004 is Ownable, ReentrancyGuard {
     uint256 public constant MAX_BATCH_SIZE = 10;
     
     bool public paused;
+
+    // Maps agent DID to the authorized signer address
+    mapping(bytes32 => address) public agentSigner;
 
     // ============ Events ============
     
@@ -94,7 +99,8 @@ contract ERC8004 is Ownable, ReentrancyGuard {
         uint256 dailyLimit,
         uint256 perTxLimit,
         address[] calldata allowedContracts,
-        bool allowAny
+        bool allowAny,
+        address signer
     ) external onlyOwner {
         agents[agentDID] = AgentConfig({
             authorized: true,
@@ -105,6 +111,8 @@ contract ERC8004 is Ownable, ReentrancyGuard {
             allowedContracts: allowedContracts,
             allowAnyContract: allowAny
         });
+
+        agentSigner[agentDID] = signer;
 
         // Update allowlist mapping for efficient lookups
         for (uint256 i = 0; i < allowedContracts.length; i++) {
@@ -194,8 +202,8 @@ contract ERC8004 is Ownable, ReentrancyGuard {
         bytes calldata data,
         uint256 value
     ) external whenNotPaused onlyAuthorizedAgent(agentDID) nonReentrant returns (bytes memory) {
-        // TODO: Add signature verification for agent identity
-        // For now, this is a simplified version
+        // Verify the caller is the authorized signer for this agent
+        require(msg.sender == agentSigner[agentDID], "ERC8004: caller not authorized signer");
         
         _validateAgentAction(agentDID, target, value);
         _updateSpending(agentDID, value);
@@ -229,6 +237,7 @@ contract ERC8004 is Ownable, ReentrancyGuard {
     ) external whenNotPaused onlyAuthorizedAgent(agentDID) nonReentrant returns (bytes[] memory) {
         require(targets.length == data.length && targets.length == values.length, "ERC8004: array length mismatch");
         require(targets.length <= MAX_BATCH_SIZE, "ERC8004: batch too large");
+        require(msg.sender == agentSigner[agentDID], "ERC8004: caller not authorized signer");
 
         uint256 totalValue = 0;
         for (uint256 i = 0; i < values.length; i++) {

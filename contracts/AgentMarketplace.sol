@@ -2,6 +2,8 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./AgentRegistry.sol";
 
 /**
@@ -9,7 +11,7 @@ import "./AgentRegistry.sol";
  * @notice Marketplace for AI agents to offer and consume services (escrow, payments, disputes).
  * @dev Safe for agents and humans: CEI pattern, reentrancy guards, and dispute resolution.
  */
-contract AgentMarketplace is ReentrancyGuard {
+contract AgentMarketplace is ReentrancyGuard, Ownable, Pausable {
     // -------------------------------------------------------------------------
     // Constants (audit-friendly)
     // -------------------------------------------------------------------------
@@ -82,10 +84,13 @@ contract AgentMarketplace is ReentrancyGuard {
     event StreamClaimed(bytes32 indexed streamId, uint256 amount);
     event StreamStopped(bytes32 indexed streamId);
 
-    constructor(address _registry, address _feeCollector) {
+    constructor(address _registry, address _feeCollector) Ownable(msg.sender) {
         registry = AgentRegistry(_registry);
         feeCollector = _feeCollector;
     }
+
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
 
     // -------------------------------------------------------------------------
     // Orders (CEI: checks, effects, interactions)
@@ -101,7 +106,7 @@ contract AgentMarketplace is ReentrancyGuard {
         bytes32 serviceId,
         uint256 units,
         uint256 deadline
-    ) external payable nonReentrant returns (bytes32 orderId) {
+    ) external payable nonReentrant whenNotPaused returns (bytes32 orderId) {
         (address agent, , uint256 pricePerUnit, , bool active) = registry.services(serviceId);
         if (!active) revert ServiceNotActive();
         if (deadline <= block.timestamp) revert InvalidDeadline();
@@ -230,7 +235,7 @@ contract AgentMarketplace is ReentrancyGuard {
     // Streaming payments
     // -------------------------------------------------------------------------
 
-    function startStream(address payee, uint256 ratePerSecond) external payable returns (bytes32 streamId) {
+    function startStream(address payee, uint256 ratePerSecond) external payable whenNotPaused returns (bytes32 streamId) {
         if (!registry.isActiveAgent(payee)) revert PayeeNotActiveAgent();
         if (msg.value == 0) revert MustDepositFunds();
         if (ratePerSecond == 0) revert InvalidRate();

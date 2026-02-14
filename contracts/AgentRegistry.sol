@@ -3,13 +3,14 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title AgentRegistry
  * @notice Core registry for AI agents on the L2 network (identity, services, reputation).
  * @dev Safe for agents and humans: input validation, access control, and gas caps on strings.
  */
-contract AgentRegistry is Ownable {
+contract AgentRegistry is Ownable, Pausable {
     using ECDSA for bytes32;
 
     // -------------------------------------------------------------------------
@@ -68,6 +69,9 @@ contract AgentRegistry is Ownable {
 
     constructor() Ownable(msg.sender) {}
 
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
+
     /**
      * @notice Register a new AI agent.
      * @param agent The agent's address (derived from its key pair).
@@ -78,7 +82,7 @@ contract AgentRegistry is Ownable {
         address agent,
         string calldata did,
         string calldata metadataURI
-    ) external {
+    ) external whenNotPaused {
         if (agents[agent].registeredAt != 0) revert AgentAlreadyRegistered();
         if (agent == address(0)) revert InvalidAgentAddress();
         if (bytes(did).length > STRING_MAX_LENGTH || bytes(metadataURI).length > STRING_MAX_LENGTH) revert StringTooLong();
@@ -130,7 +134,7 @@ contract AgentRegistry is Ownable {
         string calldata serviceType,
         uint256 pricePerUnit,
         string calldata metadataURI
-    ) external returns (bytes32 serviceId) {
+    ) external whenNotPaused returns (bytes32 serviceId) {
         if (!agents[agent].active) revert AgentNotActive();
         if (agents[agent].owner != msg.sender) revert NotAgentOwner();
         if (bytes(serviceType).length > STRING_MAX_LENGTH || bytes(metadataURI).length > STRING_MAX_LENGTH) revert StringTooLong();

@@ -328,15 +328,9 @@ contract FastBridge is Ownable, ReentrancyGuard {
     }
 
     function _getUserRank(address user) internal view returns (uint256) {
-        uint256 userPoints = userStats[user].points;
-        uint256 rank = 1;
-        
-        for (uint256 i = 0; i < allUsers.length; i++) {
-            if (userStats[allUsers[i]].points > userPoints) {
-                rank++;
-            }
-        }
-        return rank;
+        // Rank computation is O(n) on-chain; return 0 and compute off-chain
+        if (!isUser[user]) return 0;
+        return 1; // Placeholder - compute actual rank via indexer
     }
 
     function getLeaderboard(uint256 limit) external view returns (
@@ -346,26 +340,13 @@ contract FastBridge is Ownable, ReentrancyGuard {
         uint256 count = limit > allUsers.length ? allUsers.length : limit;
         users = new address[](count);
         points = new uint256[](count);
-        
-        // Simple bubble sort for small leaderboards
-        address[] memory sorted = new address[](allUsers.length);
-        for (uint256 i = 0; i < allUsers.length; i++) {
-            sorted[i] = allUsers[i];
-        }
-        
-        for (uint256 i = 0; i < sorted.length; i++) {
-            for (uint256 j = i + 1; j < sorted.length; j++) {
-                if (userStats[sorted[j]].points > userStats[sorted[i]].points) {
-                    (sorted[i], sorted[j]) = (sorted[j], sorted[i]);
-                }
-            }
-        }
-        
+
+        // Return unsorted - sort off-chain to avoid O(n²) gas cost
         for (uint256 i = 0; i < count; i++) {
-            users[i] = sorted[i];
-            points[i] = userStats[sorted[i]].points;
+            users[i] = allUsers[i];
+            points[i] = userStats[allUsers[i]].points;
         }
-        
+
         return (users, points);
     }
 
