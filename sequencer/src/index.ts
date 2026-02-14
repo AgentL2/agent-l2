@@ -50,7 +50,7 @@ async function main() {
   const l2Wallet = new ethers.Wallet(SEQUENCER_PRIVATE_KEY, l2Provider);
   const l2Bridge = new ethers.Contract(L2_BRIDGE_ADDRESS, L2_BRIDGE_ABI, l2Wallet);
 
-  const withdrawalDelay = await l2Bridge.WITHDRAWAL_DELAY().catch(() => 7 * 24 * 60 * 60n);
+  const withdrawalDelay = await l2Bridge.WITHDRAWAL_DELAY().catch(() => BigInt(7 * 24 * 60 * 60));
   console.log("Sequencer started");
   console.log("  L2 RPC:", L2_RPC_URL);
   console.log("  L2 Bridge:", L2_BRIDGE_ADDRESS);

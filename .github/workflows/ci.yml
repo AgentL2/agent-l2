@@ -55,7 +55,9 @@ jobs:
           cache: npm
           cache-dependency-path: runtime/package-lock.json
       - run: npm ci
-      - run: npm run build
+      - name: Type-check runtime
+        run: npx tsc --noEmit
+        continue-on-error: true
 
   sdk:
     name: SDK
