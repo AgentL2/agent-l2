@@ -10,6 +10,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * @dev Optimistic rollup bridge: sequencer processes deposits and finalizes withdrawals
  *      after a delay. Anyone can challenge fraudulent deposits or withdrawals during
  *      the fraud proof window to protect agents and users.
+ *
+ *      Integrates with the FraudProver contract for challenge authorization. When a
+ *      FraudProver address is set, challenges are routed through it for proper bond
+ *      management and slashing. If no FraudProver is set, falls back to owner-only
+ *      challenge authorization for backward compatibility.
  */
 contract L2Bridge is ReentrancyGuard, Ownable {
     // -------------------------------------------------------------------------
@@ -27,6 +32,7 @@ contract L2Bridge is ReentrancyGuard, Ownable {
     error InsufficientBalance();
     error DuplicateWithdrawal();
     error DelayNotPassed();
+    error OnlyFraudProverOrOwner();
 
     // -------------------------------------------------------------------------
     // Constants & state
@@ -36,6 +42,9 @@ contract L2Bridge is ReentrancyGuard, Ownable {
 
     address public l1Bridge;
     address public sequencer;
+
+    /// @notice Address of the FraudProver contract (authorized to trigger challenges).
+    address public fraudProver;
 
     struct Deposit {
         address l1Address;
@@ -68,6 +77,7 @@ contract L2Bridge is ReentrancyGuard, Ownable {
     event WithdrawalFinalized(bytes32 indexed withdrawalId);
     event WithdrawalChallenged(bytes32 indexed withdrawalId);
     event SequencerUpdated(address indexed oldSequencer, address indexed newSequencer);
+    event FraudProverUpdated(address indexed oldFraudProver, address indexed newFraudProver);
     event Transfer(address indexed from, address indexed to, uint256 amount);
 
     modifier onlySequencer() {
@@ -117,11 +127,17 @@ contract L2Bridge is ReentrancyGuard, Ownable {
 
     /**
      * @notice Challenge a fraudulent deposit (fraud proof).
-     * @dev Any party can call this during the fraud proof window. Reverts the L2 credit.
+     * @dev Can be called by the FraudProver contract (if set) or the owner (fallback).
+     *      When FraudProver is integrated, challenges go through proper bond management
+     *      and slashing logic. Reverts the L2 credit for the fraudulent deposit.
      * @param depositId The deposit to challenge.
      */
     function challengeDeposit(bytes32 depositId) external nonReentrant {
-        require(msg.sender == owner(), "L2Bridge: only owner can challenge deposits");
+        if (fraudProver != address(0)) {
+            if (msg.sender != fraudProver && msg.sender != owner()) revert OnlyFraudProverOrOwner();
+        } else {
+            if (msg.sender != owner()) revert OnlyFraudProverOrOwner();
+        }
         Deposit storage d = deposits[depositId];
         if (!d.processed) revert DepositNotFound();
         if (d.challenged) revert DepositAlreadyChallenged();
@@ -195,11 +211,17 @@ contract L2Bridge is ReentrancyGuard, Ownable {
 
     /**
      * @notice Challenge a fraudulent withdrawal (fraud proof).
-     * @dev Any party can call before finalization. Refunds the L2 address.
+     * @dev Can be called by the FraudProver contract (if set) or the owner (fallback).
+     *      When FraudProver is integrated, challenges go through proper bond management
+     *      and slashing logic. Refunds the L2 balance to the withdrawal initiator.
      * @param withdrawalId The withdrawal to challenge.
      */
     function challengeWithdrawal(bytes32 withdrawalId) external nonReentrant {
-        require(msg.sender == owner(), "L2Bridge: only owner can challenge withdrawals");
+        if (fraudProver != address(0)) {
+            if (msg.sender != fraudProver && msg.sender != owner()) revert OnlyFraudProverOrOwner();
+        } else {
+            if (msg.sender != owner()) revert OnlyFraudProverOrOwner();
+        }
         Withdrawal storage w = withdrawals[withdrawalId];
         if (w.l2Address == address(0)) revert WithdrawalNotFound();
         if (w.finalized) revert WithdrawalAlreadyFinalized();
@@ -223,6 +245,19 @@ contract L2Bridge is ReentrancyGuard, Ownable {
      */
     function setL1Bridge(address _l1Bridge) external onlySequencer {
         l1Bridge = _l1Bridge;
+    }
+
+    /**
+     * @notice Set the FraudProver contract address (owner only).
+     * @dev Once set, the FraudProver contract can authorize deposit and withdrawal
+     *      challenges. The owner retains challenge authority as a fallback.
+     * @param _fraudProver The address of the FraudProver contract.
+     */
+    function setFraudProver(address _fraudProver) external onlyOwner {
+        if (_fraudProver == address(0)) revert InvalidAddress();
+        address old = fraudProver;
+        fraudProver = _fraudProver;
+        emit FraudProverUpdated(old, _fraudProver);
     }
 
     /**

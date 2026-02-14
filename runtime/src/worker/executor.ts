@@ -6,8 +6,28 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { pino } from 'pino';
 import type { Agent, OrderInput, OrderResult, AgentTool } from '../shared/types.js';
+import { errorTracker } from '../utils/errors.js';
 
 const logger = pino({ name: 'executor' });
+
+/**
+ * Anthropic tool types (not exported in SDK v0.17.x)
+ */
+interface AnthropicTool {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}
+
+/**
+ * Anthropic tool_use content block (not in SDK v0.17.x ContentBlock type)
+ */
+interface ToolUseBlock {
+  type: 'tool_use';
+  id: string;
+  name: string;
+  input: unknown;
+}
 
 /**
  * Retry wrapper for transient API failures (rate limits, timeouts, server errors)
@@ -36,6 +56,11 @@ async function withRetry<T>(
         lastError.message.includes('overloaded');
 
       if (!isRetryable || attempt === maxRetries) {
+        errorTracker.track(lastError, `executor.retry.${operation}`, {
+          attempt: attempt + 1,
+          maxRetries,
+          retryable: isRetryable,
+        });
         throw lastError;
       }
 
@@ -44,11 +69,18 @@ async function withRetry<T>(
         { attempt: attempt + 1, maxRetries, delay: Math.round(delay), operation },
         `Retrying ${operation} after transient failure: ${lastError.message}`
       );
+      errorTracker.track(lastError, `executor.retry.${operation}`, {
+        attempt: attempt + 1,
+        maxRetries,
+        willRetry: true,
+      });
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
-  throw lastError || new Error(`${operation} failed after ${maxRetries} retries`);
+  const finalError = lastError || new Error(`${operation} failed after ${maxRetries} retries`);
+  errorTracker.track(finalError, `executor.retry.${operation}`, { exhausted: true });
+  throw finalError;
 }
 
 /**
@@ -190,14 +222,20 @@ async function executeAnthropic(
     ? agent.tools.map(toolToAnthropic)
     : undefined;
 
-  const response = await client.messages.create({
+  const createParams: Record<string, unknown> = {
     model: agent.model,
     system: systemMessage,
     messages: chatMessages,
     max_tokens: Math.min(agent.maxTokens, agent.guardrails.maxTokensPerRequest),
     temperature: agent.temperature,
-    tools,
-  });
+  };
+  if (tools) {
+    createParams.tools = tools;
+  }
+
+  const response = await client.messages.create(
+    createParams as unknown as Anthropic.MessageCreateParams
+  ) as Anthropic.Message;
 
   // Extract text content
   let textContent = '';
@@ -205,14 +243,15 @@ async function executeAnthropic(
 
   for (const block of response.content) {
     if (block.type === 'text') {
-      textContent += block.text;
+      textContent += (block as any).text;
     } else if (block.type === 'tool_use') {
-      const tool = agent.tools.find((t) => t.name === block.name);
+      const toolBlock = block as any;
+      const tool = agent.tools.find((t: AgentTool) => t.name === toolBlock.name);
       if (tool) {
-        const toolOutput = await executeToolCall(tool, block.input as Record<string, unknown>, secrets);
+        const toolOutput = await executeToolCall(tool, toolBlock.input as Record<string, unknown>, secrets);
         toolCalls.push({
           tool: tool.name,
-          input: block.input as Record<string, unknown>,
+          input: toolBlock.input as Record<string, unknown>,
           output: toolOutput,
         });
       }
@@ -406,6 +445,11 @@ async function executeWebhookTool(
     return await response.json();
   } catch (err) {
     logger.error({ err, tool: tool.name }, 'Webhook tool execution failed');
+    errorTracker.track(
+      err instanceof Error ? err : new Error(String(err)),
+      'executor.webhook',
+      { tool: tool.name, webhookUrl: tool.webhookUrl }
+    );
     throw err;
   }
 }
@@ -427,10 +471,10 @@ function toolToOpenAI(tool: AgentTool): OpenAI.Chat.Completions.ChatCompletionTo
 /**
  * Convert tool to Anthropic format
  */
-function toolToAnthropic(tool: AgentTool): Anthropic.Tool {
+function toolToAnthropic(tool: AgentTool): AnthropicTool {
   return {
     name: tool.name,
     description: tool.description,
-    input_schema: tool.parameters as Anthropic.Tool.InputSchema,
+    input_schema: tool.parameters as Record<string, unknown>,
   };
 }

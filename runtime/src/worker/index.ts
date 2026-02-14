@@ -9,6 +9,7 @@ import * as db from '../shared/db.js';
 import { decrypt } from '../shared/crypto.js';
 import { hash } from '../shared/crypto.js';
 import { executeAgent } from './executor.js';
+import { errorTracker } from '../utils/errors.js';
 import type { Agent, Order, OrderResult } from '../shared/types.js';
 
 const logger = pino({ name: 'worker' });
@@ -120,6 +121,11 @@ async function processOrder(order: Order, agent: Agent): Promise<void> {
         logger.info({ orderId: order.orderId, txHash: receipt.hash }, 'Order completed on-chain');
       } catch (chainErr) {
         logger.error({ err: chainErr, orderId: order.orderId }, 'Failed to complete order on-chain');
+        errorTracker.track(
+          chainErr instanceof Error ? chainErr : new Error(String(chainErr)),
+          'worker.completeOnChain',
+          { orderId: order.orderId, agentId: agent.id }
+        );
         // Order is still completed in our system, just not on-chain
         await db.createLog({
           agentId: agent.id,
@@ -134,7 +140,13 @@ async function processOrder(order: Order, agent: Agent): Promise<void> {
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     logger.error({ err, orderId: order.orderId }, 'Order execution failed');
-    
+
+    errorTracker.track(
+      err instanceof Error ? err : new Error(errorMessage),
+      'worker.processOrder',
+      { orderId: order.orderId, agentId: agent.id, executionTimeMs: Date.now() - startTime }
+    );
+
     await db.updateOrderStatus(order.id, 'failed', {
       errorMessage,
       executionTimeMs: Date.now() - startTime,
@@ -191,6 +203,10 @@ async function pollForOrders(): Promise<void> {
     }
   } catch (err) {
     logger.error({ err }, 'Error polling for orders');
+    errorTracker.track(
+      err instanceof Error ? err : new Error(String(err)),
+      'worker.pollForOrders'
+    );
   }
 }
 

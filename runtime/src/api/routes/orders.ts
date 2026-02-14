@@ -2,13 +2,13 @@
  * Order API Routes
  */
 
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import * as db from '../../shared/db.js';
 
 export const orderRoutes = Router();
 
 // Get order by ID
-orderRoutes.get('/:id', async (req, res) => {
+orderRoutes.get('/:id', async (req: Request, res: Response) => {
   try {
     const order = await db.getOrderById(req.params.id);
     if (!order) {
@@ -22,7 +22,7 @@ orderRoutes.get('/:id', async (req, res) => {
 });
 
 // Get order by chain ID
-orderRoutes.get('/chain/:orderId', async (req, res) => {
+orderRoutes.get('/chain/:orderId', async (req: Request, res: Response) => {
   try {
     const order = await db.getOrderByChainId(req.params.orderId);
     if (!order) {
@@ -36,7 +36,7 @@ orderRoutes.get('/chain/:orderId', async (req, res) => {
 });
 
 // Retry a failed order (for manual intervention)
-orderRoutes.post('/:id/retry', async (req, res) => {
+orderRoutes.post('/:id/retry', async (req: Request, res: Response) => {
   try {
     const order = await db.getOrderById(req.params.id);
     if (!order) {
@@ -56,7 +56,7 @@ orderRoutes.post('/:id/retry', async (req, res) => {
 });
 
 // Cancel an order (only if pending)
-orderRoutes.post('/:id/cancel', async (req, res) => {
+orderRoutes.post('/:id/cancel', async (req: Request, res: Response) => {
   try {
     const order = await db.getOrderById(req.params.id);
     if (!order) {

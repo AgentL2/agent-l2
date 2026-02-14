@@ -5,8 +5,12 @@
 
 import { NextResponse } from 'next/server';
 import { hostedAgentsStore, type HostedAgentData } from '../_store';
+import { hostedLimiter } from '@/lib/rate-limit';
 
 export async function GET(request: Request) {
+  const limited = hostedLimiter.check(request);
+  if (limited) return limited;
+
   const { searchParams } = new URL(request.url);
   const address = searchParams.get('address');
 

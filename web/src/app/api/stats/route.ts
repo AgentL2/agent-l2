@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getRegistry, getMarketplace, isConfigured } from '@/lib/contracts';
+import { generalLimiter } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,7 +8,9 @@ export const dynamic = 'force-dynamic';
 let statsCache: { data: any; timestamp: number } | null = null;
 const CACHE_TTL_MS = 60_000; // 1 minute
 
-export async function GET() {
+export async function GET(request: Request) {
+  const limited = generalLimiter.check(request);
+  if (limited) return limited;
   if (!isConfigured()) {
     return NextResponse.json({
       agentCount: 0,

@@ -3,11 +3,10 @@
  * Delegates task execution to external services via webhooks
  */
 
-import type { TaskInput, TaskResult, ExecutionEstimate } from '../types.js';
-import { BaseExecutor } from './base.js';
+import type { TaskInput, TaskResult, ExecutionEstimate, ExecutionMetadata, Executor } from '../types.js';
+import { createHash } from 'crypto';
 
 export interface WebhookExecutorConfig {
-  privateKey: string;
   /** Base URL for the webhook endpoint */
   webhookUrl: string;
   /** API key for authentication (optional) */
@@ -31,7 +30,7 @@ export interface WebhookResponse {
   };
 }
 
-export class WebhookExecutor extends BaseExecutor {
+export class WebhookExecutor implements Executor {
   id: string;
   name: string;
   version = '1.0.0';
@@ -43,13 +42,12 @@ export class WebhookExecutor extends BaseExecutor {
   private headers: Record<string, string>;
 
   constructor(config: WebhookExecutorConfig) {
-    super(config.privateKey);
     this.webhookUrl = config.webhookUrl;
     this.apiKey = config.apiKey;
     this.serviceTypes = config.serviceTypes;
     this.timeout = config.timeout ?? 60000;
     this.headers = config.headers ?? {};
-    
+
     // Generate ID from URL
     const urlHash = Buffer.from(config.webhookUrl).toString('base64').slice(0, 8);
     this.id = `webhook-${urlHash}`;
@@ -64,7 +62,7 @@ export class WebhookExecutor extends BaseExecutor {
         'Content-Type': 'application/json',
         ...this.headers,
       };
-      
+
       if (this.apiKey) {
         headers['Authorization'] = `Bearer ${this.apiKey}`;
       }
@@ -100,27 +98,29 @@ export class WebhookExecutor extends BaseExecutor {
         return this.createFailedResult(task, result.error ?? 'Webhook execution failed', startTime);
       }
 
-      // Generate proof of work
-      const proof = await this.proofGenerator.generateSimpleProof(
-        task,
-        task.payload,
-        result.output
-      );
-
       // Generate result hash
-      const resultHash = this.proofGenerator.generateResultHash(result.output);
+      const resultHash = this.generateResultHash(result.output);
 
       return {
         success: true,
         resultURI: '', // Will be set by runtime after storage
         resultHash,
-        proof,
+        proof: {
+          type: 'llm-completion',
+          timestamp: Date.now(),
+          inputHash: this.hashData(task.payload),
+          outputHash: this.hashData(result.output),
+          evidence: {
+            apiCallHash: this.hashData({ url: this.webhookUrl, response: result.output }),
+          },
+          signature: '',
+        },
         metadata: this.createMetadata(startTime, {
           modelUsed: result.metadata?.modelUsed,
           tokensUsed: result.metadata?.tokensUsed,
         }),
       };
-    } catch (error) {
+    } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       return this.createFailedResult(task, message, startTime);
     }
@@ -146,5 +146,51 @@ export class WebhookExecutor extends BaseExecutor {
       // If health endpoint doesn't exist, assume healthy
       return true;
     }
+  }
+
+  private createFailedResult(task: TaskInput, error: string, startTime: number): TaskResult {
+    return {
+      success: false,
+      resultURI: '',
+      resultHash: new Uint8Array(32),
+      proof: {
+        type: 'llm-completion',
+        timestamp: Date.now(),
+        inputHash: this.hashData(task.payload),
+        outputHash: '',
+        evidence: {},
+        signature: '',
+      },
+      error,
+      metadata: this.createMetadata(startTime),
+    };
+  }
+
+  private createMetadata(
+    startTime: number,
+    extra?: { modelUsed?: string; tokensUsed?: number }
+  ): ExecutionMetadata {
+    const endTime = Date.now();
+    return {
+      startTime,
+      endTime,
+      durationMs: endTime - startTime,
+      executorId: this.id,
+      executorVersion: this.version,
+      modelUsed: extra?.modelUsed,
+      tokensUsed: extra?.tokensUsed,
+    };
+  }
+
+  private generateResultHash(data: unknown): Uint8Array {
+    const hash = createHash('sha256');
+    hash.update(JSON.stringify(data));
+    return new Uint8Array(hash.digest());
+  }
+
+  private hashData(data: unknown): string {
+    const hash = createHash('sha256');
+    hash.update(JSON.stringify(data ?? ''));
+    return hash.digest('hex');
   }
 }

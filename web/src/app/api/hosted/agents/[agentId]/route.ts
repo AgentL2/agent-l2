@@ -5,11 +5,15 @@
 
 import { NextResponse } from 'next/server';
 import { hostedAgentsStore } from '../../_store';
+import { hostedLimiter, sensitiveLimiter } from '@/lib/rate-limit';
 
 export async function GET(
   request: Request,
   { params }: { params: { agentId: string } }
 ) {
+  const limited = hostedLimiter.check(request);
+  if (limited) return limited;
+
   const { agentId } = params;
   const agent = hostedAgentsStore.getAgent(agentId);
 
@@ -26,6 +30,9 @@ export async function DELETE(
   request: Request,
   { params }: { params: { agentId: string } }
 ) {
+  const limited = sensitiveLimiter.check(request);
+  if (limited) return limited;
+
   const { agentId } = params;
   const agent = hostedAgentsStore.getAgent(agentId);
 

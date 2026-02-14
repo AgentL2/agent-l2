@@ -3,7 +3,7 @@
  * Supports DeepSeek V3, R1 (reasoning) models
  */
 
-import { BaseExecutor, ExecutorInput, ExecutorResult } from './base';
+import { BaseExecutor, ExecutorInput, ExecutorResult, ToolDefinition } from './base.js';
 
 export class DeepSeekExecutor extends BaseExecutor {
   id = 'deepseek';
@@ -44,7 +44,7 @@ export class DeepSeekExecutor extends BaseExecutor {
     };
 
     if (input.tools && input.tools.length > 0) {
-      body.tools = input.tools.map(t => ({
+      body.tools = input.tools.map((t: ToolDefinition) => ({
         type: 'function',
         function: {
           name: t.name,

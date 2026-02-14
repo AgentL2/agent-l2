@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getChainConfig, isConfigured } from '@/lib/contracts';
 import { getL1BridgeConfig } from '@/lib/bridge';
+import { generalLimiter } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const limited = generalLimiter.check(request);
+  if (limited) return limited;
   const config = getChainConfig();
   const l1Config = getL1BridgeConfig();
   return NextResponse.json({

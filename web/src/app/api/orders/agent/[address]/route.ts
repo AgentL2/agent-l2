@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import { getMarketplace, getRegistry, isConfigured } from '@/lib/contracts';
+import { generalLimiter } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,9 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ address: string }> | { address: string } }
 ) {
+  const limited = generalLimiter.check(_request);
+  if (limited) return limited;
+
   const resolved = typeof (params as Promise<{ address: string }>).then === 'function'
     ? await (params as Promise<{ address: string }>)
     : (params as { address: string });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import { getProvider, getMarketplace, getChainConfig, isConfigured } from '@/lib/contracts';
+import { generalLimiter } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,8 @@ const MARKETPLACE_IFACE = new ethers.Interface([
 
 /** Index of completed work (proof of work) from the marketplace. Result content stays at resultURI (can be private). */
 export async function GET(request: NextRequest) {
+  const limited = generalLimiter.check(request);
+  if (limited) return limited;
   if (!isConfigured()) {
     return NextResponse.json({ items: [] });
   }

@@ -2,7 +2,7 @@
  * Agent API Routes
  */
 
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import * as db from '../../shared/db.js';
 import { encrypt, decrypt } from '../../shared/crypto.js';
@@ -56,7 +56,7 @@ const storeSecretSchema = z.object({
 // =============================================================================
 
 // List agents for an owner
-agentRoutes.get('/', async (req, res) => {
+agentRoutes.get('/', async (req: Request, res: Response) => {
   try {
     const owner = req.query.owner as string;
     if (!owner || !/^0x[a-fA-F0-9]{40}$/.test(owner)) {
@@ -72,7 +72,7 @@ agentRoutes.get('/', async (req, res) => {
 });
 
 // Get single agent
-agentRoutes.get('/:id', async (req, res) => {
+agentRoutes.get('/:id', async (req: Request, res: Response) => {
   try {
     const agent = await db.getAgentById(req.params.id);
     if (!agent) {
@@ -86,7 +86,7 @@ agentRoutes.get('/:id', async (req, res) => {
 });
 
 // Create agent
-agentRoutes.post('/', async (req, res) => {
+agentRoutes.post('/', async (req: Request, res: Response) => {
   try {
     const parsed = createAgentSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -102,7 +102,7 @@ agentRoutes.post('/', async (req, res) => {
 });
 
 // Update agent
-agentRoutes.patch('/:id', async (req, res) => {
+agentRoutes.patch('/:id', async (req: Request, res: Response) => {
   try {
     const parsed = updateAgentSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -121,7 +121,7 @@ agentRoutes.patch('/:id', async (req, res) => {
 });
 
 // Delete agent
-agentRoutes.delete('/:id', async (req, res) => {
+agentRoutes.delete('/:id', async (req: Request, res: Response) => {
   try {
     const deleted = await db.deleteAgent(req.params.id);
     if (!deleted) {
@@ -139,7 +139,7 @@ agentRoutes.delete('/:id', async (req, res) => {
 // =============================================================================
 
 // List secret keys (not values)
-agentRoutes.get('/:id/secrets', async (req, res) => {
+agentRoutes.get('/:id/secrets', async (req: Request, res: Response) => {
   try {
     const agent = await db.getAgentById(req.params.id);
     if (!agent) {
@@ -155,7 +155,7 @@ agentRoutes.get('/:id/secrets', async (req, res) => {
 });
 
 // Store a secret
-agentRoutes.post('/:id/secrets', async (req, res) => {
+agentRoutes.post('/:id/secrets', async (req: Request, res: Response) => {
   try {
     const agent = await db.getAgentById(req.params.id);
     if (!agent) {
@@ -178,7 +178,7 @@ agentRoutes.post('/:id/secrets', async (req, res) => {
 });
 
 // Delete a secret
-agentRoutes.delete('/:id/secrets/:key', async (req, res) => {
+agentRoutes.delete('/:id/secrets/:key', async (req: Request, res: Response) => {
   try {
     const deleted = await db.deleteAgentSecret(req.params.id, req.params.key);
     if (!deleted) {
@@ -195,7 +195,7 @@ agentRoutes.delete('/:id/secrets/:key', async (req, res) => {
 // Logs
 // =============================================================================
 
-agentRoutes.get('/:id/logs', async (req, res) => {
+agentRoutes.get('/:id/logs', async (req: Request, res: Response) => {
   try {
     const agent = await db.getAgentById(req.params.id);
     if (!agent) {
@@ -215,7 +215,7 @@ agentRoutes.get('/:id/logs', async (req, res) => {
 // Orders for this agent
 // =============================================================================
 
-agentRoutes.get('/:id/orders', async (req, res) => {
+agentRoutes.get('/:id/orders', async (req: Request, res: Response) => {
   try {
     const agent = await db.getAgentById(req.params.id);
     if (!agent) {

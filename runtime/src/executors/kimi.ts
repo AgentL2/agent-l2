@@ -3,7 +3,7 @@
  * Supports Kimi (Moonshot) models - great for long context
  */
 
-import { BaseExecutor, ExecutorInput, ExecutorResult } from './base';
+import { BaseExecutor, ExecutorInput, ExecutorResult, ToolDefinition } from './base.js';
 
 export class KimiExecutor extends BaseExecutor {
   id = 'kimi';
@@ -45,7 +45,7 @@ export class KimiExecutor extends BaseExecutor {
     };
 
     if (input.tools && input.tools.length > 0) {
-      body.tools = input.tools.map(t => ({
+      body.tools = input.tools.map((t: ToolDefinition) => ({
         type: 'function',
         function: {
           name: t.name,

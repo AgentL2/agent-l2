@@ -77,13 +77,21 @@ describe("L2Bridge", function () {
     });
   });
 
-  describe("Challenges (owner-only)", function () {
-    it("Should reject challenge from non-owner", async function () {
+  describe("Challenges (owner or FraudProver)", function () {
+    it("Should reject challenge from non-owner when no FraudProver set", async function () {
       const { bridge, sequencer, user1 } = await loadFixture(deployFixture);
       const depositId = ethers.keccak256(ethers.toUtf8Bytes("dep1"));
       await bridge.connect(sequencer).processDeposit(depositId, user1.address, user1.address, ethers.parseEther("1"));
       await expect(bridge.connect(user1).challengeDeposit(depositId))
-        .to.be.revertedWith("L2Bridge: only owner can challenge deposits");
+        .to.be.revertedWithCustomError(bridge, "OnlyFraudProverOrOwner");
+    });
+
+    it("Should allow owner to challenge deposit", async function () {
+      const { bridge, owner, sequencer, user1 } = await loadFixture(deployFixture);
+      const depositId = ethers.keccak256(ethers.toUtf8Bytes("dep-challenge-owner"));
+      await bridge.connect(sequencer).processDeposit(depositId, user1.address, user1.address, ethers.parseEther("1"));
+      await expect(bridge.connect(owner).challengeDeposit(depositId))
+        .to.emit(bridge, "DepositChallenged");
     });
   });
 

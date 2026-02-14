@@ -3,7 +3,7 @@
  * Post tweets, reply, DM, search, analytics
  */
 
-import { BaseIntegration, ActionResult, Credentials, IntegrationAction, OAuthConfig } from '../base';
+import { BaseIntegration, ActionResult, Credentials, IntegrationAction, OAuthConfig } from '../base.js';
 
 export class TwitterIntegration extends BaseIntegration {
   id = 'twitter';

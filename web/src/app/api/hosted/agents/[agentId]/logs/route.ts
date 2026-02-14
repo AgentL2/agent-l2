@@ -4,11 +4,15 @@
 
 import { NextResponse } from 'next/server';
 import { hostedAgentsStore } from '../../../_store';
+import { hostedLimiter } from '@/lib/rate-limit';
 
 export async function GET(
   request: Request,
   { params }: { params: { agentId: string } }
 ) {
+  const limited = hostedLimiter.check(request);
+  if (limited) return limited;
+
   const { agentId } = params;
   const { searchParams } = new URL(request.url);
   const limit = parseInt(searchParams.get('limit') || '50', 10);

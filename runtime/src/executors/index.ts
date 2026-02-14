@@ -3,21 +3,29 @@
  * Export all executors and registry
  */
 
-export * from './base';
-export * from './openai';
-export * from './anthropic';
-export * from './google';
-export * from './deepseek';
-export * from './grok';
-export * from './kimi';
+export * from './base.js';
+export * from './openai.js';
+export * from './anthropic.js';
+export * from './google.js';
+export * from './deepseek.js';
+export * from './grok.js';
+export * from './kimi.js';
+export * from './webhook.js';
 
-import { executorRegistry } from './base';
-import { OpenAIExecutor } from './openai';
-import { AnthropicExecutor } from './anthropic';
-import { GoogleExecutor } from './google';
-import { DeepSeekExecutor } from './deepseek';
-import { GrokExecutor } from './grok';
-import { KimiExecutor } from './kimi';
+/**
+ * Config type aliases for convenience
+ */
+export type OpenAIExecutorConfig = {
+  apiKey?: string;
+};
+
+import { executorRegistry } from './base.js';
+import { OpenAIExecutor } from './openai.js';
+import { AnthropicExecutor } from './anthropic.js';
+import { GoogleExecutor } from './google.js';
+import { DeepSeekExecutor } from './deepseek.js';
+import { GrokExecutor } from './grok.js';
+import { KimiExecutor } from './kimi.js';
 
 /**
  * Initialize all executors with optional API keys

@@ -16,8 +16,11 @@ import type {
   RuntimeEvent,
   EventCallback,
   ResultStorage,
+  ExecutionMetadata,
+  ResultData,
 } from './types.js';
 import { ExecutorRegistry, OpenAIExecutor } from './executors/index.js';
+import type { BaseExecutor, ExecutorResult } from './executors/index.js';
 import { LocalStorage, IPFSStorage } from './storage.js';
 import { ProofGenerator } from './proof.js';
 
@@ -86,16 +89,13 @@ export class AgentRuntime {
 
     // Register default executors
     if (config.openaiApiKey) {
-      this.executors.register(new OpenAIExecutor({
-        privateKey: config.privateKey,
-        apiKey: config.openaiApiKey,
-      }));
+      this.executors.register(new OpenAIExecutor(config.openaiApiKey));
     }
 
-    // Register custom executors
+    // Register custom executors (Executor interface is compatible at runtime)
     if (config.executors) {
       for (const executor of config.executors) {
-        this.executors.register(executor);
+        this.executors.register(executor as unknown as BaseExecutor);
       }
     }
   }
@@ -140,7 +140,8 @@ export class AgentRuntime {
     const executorList = this.executors.list();
     console.log(`Registered Executors (${executorList.length}):`);
     for (const executor of executorList) {
-      console.log(`  - ${executor.name} [${executor.serviceTypes.join(', ')}]`);
+      const serviceTypes = (executor as any).serviceTypes ?? [executor.provider];
+      console.log(`  - ${executor.name} [${serviceTypes.join(', ')}]`);
     }
     console.log('');
 
@@ -346,7 +347,7 @@ export class AgentRuntime {
       console.log(`  Units: ${order.units}`);
 
       // Find executor
-      const executor = this.executors.findExecutor(serviceType);
+      const executor = this.executors.getForServiceType(serviceType);
       if (!executor) {
         console.error(`[Runtime] No executor found for service type: ${serviceType}`);
         this.emit({ type: 'execution_failed', orderId, error: `No executor for ${serviceType}` });
@@ -368,35 +369,68 @@ export class AgentRuntime {
         payload: await this.fetchOrderPayload(order.serviceId, service.metadataURI),
       };
 
-      // Execute task
-      const result = await executor.execute(task);
+      // Execute task — adapt TaskInput to ExecutorInput for the BaseExecutor interface
+      const executorInput = {
+        prompt: JSON.stringify(task.payload ?? {}),
+        systemPrompt: `Process ${serviceType} order ${orderId}`,
+        maxTokens: 4096,
+      };
+      const startTime = Date.now();
+      const execResult: ExecutorResult = await executor.execute(executorInput);
+      const endTime = Date.now();
 
-      if (!result.success) {
-        console.error(`[Runtime] Execution failed: ${result.error}`);
-        this.emit({ type: 'execution_failed', orderId, error: result.error ?? 'Unknown error' });
+      if (!execResult.success) {
+        const errorMsg = (execResult as any).error ?? execResult.content ?? 'Unknown error';
+        console.error(`[Runtime] Execution failed: ${errorMsg}`);
+        this.emit({ type: 'execution_failed', orderId, error: errorMsg });
         return;
       }
 
-      console.log(`[Runtime] Execution completed in ${result.metadata.durationMs}ms`);
-      this.emit({ type: 'execution_completed', orderId, result });
+      // Adapt ExecutorResult → TaskResult
+      const resultHash = new Uint8Array(
+        Buffer.from(
+          ethers.keccak256(ethers.toUtf8Bytes(execResult.content)).slice(2),
+          'hex'
+        )
+      );
+      const proof = await this.proofGenerator.generateSimpleProof(task, task.payload, execResult.content);
+      const metadata: ExecutionMetadata = {
+        startTime,
+        endTime,
+        durationMs: endTime - startTime,
+        executorId: executor.id,
+        executorVersion: '1.0.0',
+        modelUsed: execResult.model,
+        tokensUsed: execResult.usage.totalTokens,
+      };
+      const taskResult: TaskResult = {
+        success: true,
+        resultURI: '',
+        resultHash,
+        proof,
+        metadata,
+      };
+
+      console.log(`[Runtime] Execution completed in ${metadata.durationMs}ms`);
+      this.emit({ type: 'execution_completed', orderId, result: taskResult });
 
       // Store result
-      const resultData = {
+      const resultData: ResultData = {
         orderId,
         serviceType,
         input: task.payload ?? {},
-        output: { resultHash: Buffer.from(result.resultHash).toString('hex') },
-        proof: result.proof,
-        metadata: result.metadata,
+        output: { resultHash: Buffer.from(resultHash).toString('hex') },
+        proof,
+        metadata,
       };
       const resultURI = await this.storage.store(resultData);
-      result.resultURI = resultURI;
+      taskResult.resultURI = resultURI;
 
       console.log(`[Runtime] Result stored: ${resultURI}`);
 
       // Complete order on-chain
       if (this.config.autoComplete !== false) {
-        await this.completeOrderOnChain(orderId, resultURI, result.resultHash);
+        await this.completeOrderOnChain(orderId, resultURI, resultHash);
       }
 
       this.processedOrders.add(orderId);
@@ -537,7 +571,7 @@ export class AgentRuntime {
    * Register a custom executor
    */
   registerExecutor(executor: Executor): void {
-    this.executors.register(executor);
+    this.executors.register(executor as unknown as BaseExecutor);
   }
 
   /**
@@ -563,7 +597,17 @@ export class AgentRuntime {
     executors: { id: string; name: string; healthy: boolean }[];
   }> {
     const isRegistered = await this.registry.isActiveAgent(this.address);
-    const healthResults = await this.executors.healthCheck();
+
+    // Health check each executor individually
+    const healthResults = new Map<string, boolean>();
+    for (const executor of this.executors.list()) {
+      try {
+        const hc = (executor as any).healthCheck;
+        healthResults.set(executor.id, hc ? await hc() : true);
+      } catch {
+        healthResults.set(executor.id, false);
+      }
+    }
 
     return {
       running: this.running,
@@ -571,7 +615,7 @@ export class AgentRuntime {
       isRegistered,
       processingOrders: this.processingOrders.size,
       processedOrders: this.processedOrders.size,
-      executors: this.executors.list().map((e) => ({
+      executors: this.executors.list().map((e: BaseExecutor) => ({
         id: e.id,
         name: e.name,
         healthy: healthResults.get(e.id) ?? false,

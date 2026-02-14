@@ -3,7 +3,7 @@
  * Supports Claude 3.5 Sonnet, Claude 4 Opus/Sonnet models
  */
 
-import { BaseExecutor, ExecutorInput, ExecutorResult } from './base';
+import { BaseExecutor, ExecutorInput, ExecutorResult, ToolDefinition } from './base.js';
 
 export class AnthropicExecutor extends BaseExecutor {
   id = 'anthropic';
@@ -71,7 +71,7 @@ export class AnthropicExecutor extends BaseExecutor {
     }
 
     if (input.tools && input.tools.length > 0) {
-      body.tools = input.tools.map(t => ({
+      body.tools = input.tools.map((t: ToolDefinition) => ({
         name: t.name,
         description: t.description,
         input_schema: t.parameters,

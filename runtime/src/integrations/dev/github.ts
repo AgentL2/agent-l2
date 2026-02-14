@@ -3,7 +3,7 @@
  * Repos, issues, PRs, actions, deployments
  */
 
-import { BaseIntegration, ActionResult, Credentials, IntegrationAction, OAuthConfig } from '../base';
+import { BaseIntegration, ActionResult, Credentials, IntegrationAction, OAuthConfig } from '../base.js';
 
 export class GitHubIntegration extends BaseIntegration {
   id = 'github';

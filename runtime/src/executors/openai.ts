@@ -3,7 +3,7 @@
  * Supports GPT-4, GPT-4o, o1, o3 models
  */
 
-import { BaseExecutor, ExecutorInput, ExecutorResult } from './base';
+import { BaseExecutor, ExecutorInput, ExecutorResult, ToolDefinition } from './base.js';
 
 export class OpenAIExecutor extends BaseExecutor {
   id = 'openai';
@@ -65,7 +65,7 @@ export class OpenAIExecutor extends BaseExecutor {
     }
 
     if (input.tools && input.tools.length > 0) {
-      body.tools = input.tools.map(t => ({
+      body.tools = input.tools.map((t: ToolDefinition) => ({
         type: 'function',
         function: {
           name: t.name,

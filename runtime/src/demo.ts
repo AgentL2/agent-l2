@@ -5,7 +5,6 @@
 
 import 'dotenv/config';
 import { AgentRuntime } from './runtime.js';
-import { OpenAIExecutor } from './executors/index.js';
 
 async function main() {
   console.log('AgentL2 Runtime Demo\n');

@@ -3,7 +3,7 @@
  * Supports Gemini 2.0, Gemini Pro models
  */
 
-import { BaseExecutor, ExecutorInput, ExecutorResult } from './base';
+import { BaseExecutor, ExecutorInput, ExecutorResult, ToolDefinition } from './base.js';
 
 export class GoogleExecutor extends BaseExecutor {
   id = 'google';
@@ -80,7 +80,7 @@ export class GoogleExecutor extends BaseExecutor {
 
     if (input.tools && input.tools.length > 0) {
       body.tools = [{
-        functionDeclarations: input.tools.map(t => ({
+        functionDeclarations: input.tools.map((t: ToolDefinition) => ({
           name: t.name,
           description: t.description,
           parameters: t.parameters,

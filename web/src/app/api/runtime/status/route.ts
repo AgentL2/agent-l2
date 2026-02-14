@@ -7,6 +7,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { generalLimiter, sensitiveLimiter } from '@/lib/rate-limit';
 
 // In-memory runtime status store (would be Redis/DB in production)
 // This gets populated by the runtime's webhook notifications
@@ -42,6 +43,9 @@ interface RuntimeConfigSummary {
 }
 
 export async function GET(request: Request) {
+  const limited = generalLimiter.check(request);
+  if (limited) return limited;
+
   const { searchParams } = new URL(request.url);
   const address = searchParams.get('address');
 
@@ -74,6 +78,9 @@ export async function GET(request: Request) {
 
 // Endpoint for runtime to report status (called by runtime's webhook)
 export async function POST(request: Request) {
+  const limited = sensitiveLimiter.check(request);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const { address, status, event } = body;
@@ -142,6 +149,9 @@ export async function POST(request: Request) {
 
 // Allow runtime to disconnect
 export async function DELETE(request: Request) {
+  const limited = sensitiveLimiter.check(request);
+  if (limited) return limited;
+
   const { searchParams } = new URL(request.url);
   const address = searchParams.get('address');
 

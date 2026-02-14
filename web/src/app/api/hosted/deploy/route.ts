@@ -6,8 +6,12 @@
 import { NextResponse } from 'next/server';
 import { hostedAgentsStore } from '../_store';
 import { EXECUTOR_TEMPLATES } from '@/lib/hosted';
+import { sensitiveLimiter } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
+  const limited = sensitiveLimiter.check(request);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const { address, name, templateId, config, secrets } = body;
